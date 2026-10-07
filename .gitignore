@@ -1,0 +1,43 @@
+## Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Build results
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+
+## Test results and coverage
+[Tt]est[Rr]esult*/
+coverage/
+*.coverage
+*.coveragexml
+
+## IDEs
+.idea/
+.vscode/
+*.DotSettings.user
+
+## Local configuration and secrets
+.env
+.env.*
+!.env.example
+appsettings.Local.json
+secrets.json
+.keys/
+
+## Logs and local databases
+logs/
+*.log
+*.db
+*.db-shm
+*.db-wal
+
+## Operating system files
+.DS_Store
+Thumbs.db
