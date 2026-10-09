@@ -7,6 +7,7 @@ public interface ITransportService
 {
     Task<IReadOnlyList<CustomerDto>> GetCustomersAsync(string? search, CancellationToken cancellationToken);
     Task<Result<CustomerDto>> GetCustomerAsync(Guid id, CancellationToken cancellationToken);
+    Task<Result<CustomerDto>> GetCustomerByUserIdAsync(Guid userId, CancellationToken cancellationToken);
     Task<Result<CustomerDto>> CreateCustomerAsync(CreateCustomerCommand command, CancellationToken cancellationToken);
     Task<Result<CustomerDto>> UpdateCustomerAsync(Guid id, UpdateCustomerCommand command, CancellationToken cancellationToken);
     Task<Result> SetCustomerActiveAsync(Guid id, bool isActive, CancellationToken cancellationToken);

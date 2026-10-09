@@ -7,7 +7,7 @@ using TransManagement.Domain.Enums;
 
 namespace TransManagement.API.Controllers;
 
-[Authorize]
+[Authorize(Roles = $"{AppRoles.Admin},{AppRoles.Dispatcher}")]
 public sealed class DriversController(ITransportService service) : ApiControllerBase
 {
     [HttpGet]

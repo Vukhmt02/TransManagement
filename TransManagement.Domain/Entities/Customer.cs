@@ -34,6 +34,8 @@ public sealed class Customer : AuditableEntity
 
     public bool IsActive { get; private set; } = true;
 
+    public Guid? UserId { get; private set; }
+
     public ICollection<TransportOrder> TransportOrders { get; private set; } = [];
 
     public void Update(string name, string phone, string? email, string? taxCode, string? address)
@@ -49,4 +51,11 @@ public sealed class Customer : AuditableEntity
     }
 
     public void SetActive(bool isActive) => IsActive = isActive;
+
+    public void LinkToUser(Guid userId)
+    {
+        if (userId == Guid.Empty) throw new ArgumentException("User ID is required.", nameof(userId));
+        if (UserId.HasValue && UserId != userId) throw new InvalidOperationException("Customer is already linked to another user.");
+        UserId = userId;
+    }
 }

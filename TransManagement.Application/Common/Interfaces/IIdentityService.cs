@@ -9,6 +9,7 @@ public interface IIdentityService
         string email,
         string password,
         string fullName,
+        string phone,
         CancellationToken cancellationToken = default);
 
     Task<Result<AuthTokens>> LoginAsync(

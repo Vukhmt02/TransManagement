@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using TransManagement.Domain.Entities;
 
 namespace TransManagement.Infrastructure.Identity;
 
@@ -15,5 +16,6 @@ public sealed class ApplicationUser : IdentityUser<Guid>
     public bool IsActive { get; set; } = true;
 
     public ICollection<RefreshToken> RefreshTokens { get; private set; } = [];
-}
 
+    public Customer? Customer { get; private set; }
+}

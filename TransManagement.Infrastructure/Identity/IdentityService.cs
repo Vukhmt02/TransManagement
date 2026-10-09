@@ -10,6 +10,7 @@ using TransManagement.Application.Common.Identity;
 using TransManagement.Application.Common.Interfaces;
 using TransManagement.Application.Common.Models;
 using TransManagement.Application.Common.Security;
+using TransManagement.Domain.Entities;
 using TransManagement.Infrastructure.Persistence;
 
 namespace TransManagement.Infrastructure.Identity;
@@ -25,13 +26,16 @@ public sealed class IdentityService(
         string email,
         string password,
         string fullName,
+        string phone,
         CancellationToken cancellationToken = default)
     {
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         var user = new ApplicationUser
         {
             Email = email.Trim(),
             UserName = email.Trim(),
-            FullName = fullName.Trim()
+            FullName = fullName.Trim(),
+            PhoneNumber = phone.Trim()
         };
 
         var createResult = await userManager.CreateAsync(user, password);
@@ -49,8 +53,18 @@ public sealed class IdentityService(
                 IdentityErrors.RegistrationFailed(JoinErrors(roleResult)));
         }
 
-        return Result<AuthTokens>.Success(
-            await IssueTokensAsync(user, cancellationToken));
+        var customer = new Customer(
+            $"CUS-{Guid.NewGuid():N}"[..12].ToUpperInvariant(),
+            fullName,
+            phone,
+            email);
+        customer.LinkToUser(user.Id);
+        dbContext.Customers.Add(customer);
+
+        var tokens = await IssueTokensAsync(user, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return Result<AuthTokens>.Success(tokens);
     }
 
     public async Task<Result<AuthTokens>> LoginAsync(

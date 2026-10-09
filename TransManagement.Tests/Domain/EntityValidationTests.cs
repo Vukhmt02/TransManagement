@@ -74,4 +74,16 @@ public sealed class EntityValidationTests
         Assert.NotNull(shipment.StartedAtUtc);
         Assert.NotNull(shipment.CompletedAtUtc);
     }
+
+    [Fact]
+    public void Customer_ShouldLinkToOnlyOneUser()
+    {
+        var customer = new Customer("CUS-100", "Customer", "0900000000");
+        var userId = Guid.NewGuid();
+
+        customer.LinkToUser(userId);
+
+        Assert.Equal(userId, customer.UserId);
+        Assert.Throws<InvalidOperationException>(() => customer.LinkToUser(Guid.NewGuid()));
+    }
 }

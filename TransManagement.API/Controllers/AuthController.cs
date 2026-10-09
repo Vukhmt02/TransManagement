@@ -22,6 +22,7 @@ public sealed class AuthController(IIdentityService identityService) : ApiContro
             request.Email,
             request.Password,
             request.FullName,
+            request.Phone,
             cancellationToken);
 
         return result.IsSuccess

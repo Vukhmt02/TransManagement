@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using TransManagement.Domain.Entities;
+using TransManagement.Infrastructure.Identity;
 
 namespace TransManagement.Infrastructure.Persistence.Configurations;
 
@@ -12,6 +13,7 @@ public sealed class CustomerConfiguration : AuditableEntityConfiguration<Custome
 
         builder.ToTable("customers");
         builder.HasIndex(customer => customer.Code).IsUnique();
+        builder.HasIndex(customer => customer.UserId).IsUnique();
 
         builder.Property(customer => customer.Code).HasMaxLength(32).IsRequired();
         builder.Property(customer => customer.Name).HasMaxLength(200).IsRequired();
@@ -20,6 +22,10 @@ public sealed class CustomerConfiguration : AuditableEntityConfiguration<Custome
         builder.Property(customer => customer.TaxCode).HasMaxLength(32);
         builder.Property(customer => customer.Address).HasMaxLength(500);
         builder.Property(customer => customer.IsActive).HasDefaultValue(true);
+
+        builder.HasOne<ApplicationUser>()
+            .WithOne(user => user.Customer)
+            .HasForeignKey<Customer>(customer => customer.UserId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
-

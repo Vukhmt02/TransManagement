@@ -7,7 +7,7 @@ using TransManagement.Domain.Enums;
 
 namespace TransManagement.API.Controllers;
 
-[Authorize]
+[Authorize(Roles = $"{AppRoles.Admin},{AppRoles.Dispatcher}")]
 public sealed class ShipmentsController(ITransportService service) : ApiControllerBase
 {
     [HttpGet]
@@ -29,7 +29,7 @@ public sealed class ShipmentsController(ITransportService service) : ApiControll
         return result.IsSuccess ? CreatedAtAction(nameof(Get), new { id = result.Value.Id }, ApiResponse<ShipmentDto>.Ok(result.Value)) : ErrorResponse(result.Error);
     }
 
-    [Authorize(Roles = $"{AppRoles.Admin},{AppRoles.Dispatcher},{AppRoles.Driver}")]
+    [Authorize(Roles = $"{AppRoles.Admin},{AppRoles.Dispatcher}")]
     [HttpPost("{id:guid}/start")]
     public async Task<IActionResult> Start(Guid id, CancellationToken cancellationToken)
     {
@@ -37,7 +37,7 @@ public sealed class ShipmentsController(ITransportService service) : ApiControll
         return result.IsSuccess ? NoContent() : ErrorResponse(result.Error);
     }
 
-    [Authorize(Roles = $"{AppRoles.Admin},{AppRoles.Dispatcher},{AppRoles.Driver}")]
+    [Authorize(Roles = $"{AppRoles.Admin},{AppRoles.Dispatcher}")]
     [HttpPost("{id:guid}/complete")]
     public async Task<IActionResult> Complete(Guid id, CancellationToken cancellationToken)
     {

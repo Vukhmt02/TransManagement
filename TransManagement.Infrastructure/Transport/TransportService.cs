@@ -31,6 +31,12 @@ public sealed class TransportService(ApplicationDbContext dbContext) : ITranspor
         return entity is null ? Result<CustomerDto>.Failure(NotFound) : Result<CustomerDto>.Success(Map(entity));
     }
 
+    public async Task<Result<CustomerDto>> GetCustomerByUserIdAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var entity = await dbContext.Customers.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+        return entity is null ? Result<CustomerDto>.Failure(NotFound) : Result<CustomerDto>.Success(Map(entity));
+    }
+
     public async Task<Result<CustomerDto>> CreateCustomerAsync(CreateCustomerCommand command, CancellationToken cancellationToken)
     {
         if (await dbContext.Customers.AnyAsync(x => x.Code == command.Code.Trim(), cancellationToken))
@@ -307,7 +313,7 @@ public sealed class TransportService(ApplicationDbContext dbContext) : ITranspor
         .Include(x => x.Vehicle).Include(x => x.Driver)
         .Include(x => x.ShipmentOrders).ThenInclude(x => x.TransportOrder);
 
-    private static CustomerDto Map(Customer x) => new(x.Id, x.Code, x.Name, x.Phone, x.Email, x.TaxCode, x.Address, x.IsActive);
+    private static CustomerDto Map(Customer x) => new(x.Id, x.Code, x.Name, x.Phone, x.Email, x.TaxCode, x.Address, x.IsActive, x.UserId);
     private static DriverDto Map(Driver x) => new(x.Id, x.EmployeeCode, x.FullName, x.Phone, x.LicenseNumber, x.LicenseClass, x.LicenseExpiryDate, x.Status);
     private static VehicleDto Map(Vehicle x) => new(x.Id, x.LicensePlate, x.VehicleType, x.MaxLoadKg, x.CargoVolumeM3, x.RegistrationExpiryDate, x.InsuranceExpiryDate, x.Status);
     private static TransportOrderDto Map(TransportOrder x) => new(x.Id, x.Code, x.CustomerId, x.Customer.Name, x.PickupAddress, x.DeliveryAddress, x.GoodsDescription, x.WeightKg, x.VolumeM3, x.PackageCount, x.ExpectedPickupAtUtc, x.ExpectedDeliveryAtUtc, x.EstimatedPrice, x.SenderName, x.SenderPhone, x.RecipientName, x.RecipientPhone, x.Note, x.Status);

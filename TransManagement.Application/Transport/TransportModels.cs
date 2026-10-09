@@ -4,7 +4,7 @@ namespace TransManagement.Application.Transport;
 
 public sealed record CustomerDto(
     Guid Id, string Code, string Name, string Phone, string? Email,
-    string? TaxCode, string? Address, bool IsActive);
+    string? TaxCode, string? Address, bool IsActive, Guid? UserId);
 
 public sealed record DriverDto(
     Guid Id, string EmployeeCode, string FullName, string Phone,

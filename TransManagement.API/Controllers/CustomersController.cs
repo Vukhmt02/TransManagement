@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using TransManagement.API.Contracts.Common;
 using TransManagement.Application.Common.Security;
 using TransManagement.Application.Transport;
@@ -10,13 +11,23 @@ namespace TransManagement.API.Controllers;
 public sealed class CustomersController(ITransportService service) : ApiControllerBase
 {
     [HttpGet]
+    [Authorize(Roles = $"{AppRoles.Admin},{AppRoles.Dispatcher}")]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<CustomerDto>>>> GetAll([FromQuery] string? search, CancellationToken cancellationToken) =>
         Ok(ApiResponse<IReadOnlyList<CustomerDto>>.Ok(await service.GetCustomersAsync(search, cancellationToken)));
 
     [HttpGet("{id:guid}")]
+    [Authorize(Roles = $"{AppRoles.Admin},{AppRoles.Dispatcher}")]
     public async Task<IActionResult> Get(Guid id, CancellationToken cancellationToken)
     {
         var result = await service.GetCustomerAsync(id, cancellationToken);
+        return result.IsSuccess ? Ok(ApiResponse<CustomerDto>.Ok(result.Value)) : ErrorResponse(result.Error);
+    }
+
+    [HttpGet("me")]
+    public async Task<IActionResult> GetMine(CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId)) return Unauthorized();
+        var result = await service.GetCustomerByUserIdAsync(userId, cancellationToken);
         return result.IsSuccess ? Ok(ApiResponse<CustomerDto>.Ok(result.Value)) : ErrorResponse(result.Error);
     }
 
