@@ -18,9 +18,73 @@ namespace TransManagement.Infrastructure.Identity;
 public sealed class IdentityService(
     UserManager<ApplicationUser> userManager,
     ApplicationDbContext dbContext,
+    IEmailSender emailSender,
     IOptions<JwtOptions> jwtOptions) : IIdentityService
 {
     private readonly JwtOptions _jwtOptions = jwtOptions.Value;
+
+    public async Task<Result> RequestRegistrationOtpAsync(string email, CancellationToken cancellationToken = default)
+    {
+        var normalizedEmail = email.Trim().ToUpperInvariant();
+        if (await userManager.Users.AnyAsync(x => x.NormalizedEmail == normalizedEmail, cancellationToken))
+            return Result.Failure(IdentityErrors.RegistrationFailed("This email is already registered."));
+
+        var now = DateTime.UtcNow;
+        var entity = await dbContext.RegistrationOtps.SingleOrDefaultAsync(x => x.NormalizedEmail == normalizedEmail, cancellationToken);
+        if (entity is not null && entity.LastSentAtUtc > now.AddSeconds(-60))
+            return Result.Failure(IdentityErrors.OtpRateLimited);
+
+        var otp = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+        var salt = Convert.ToBase64String(RandomNumberGenerator.GetBytes(16));
+        var hash = HashOtp(normalizedEmail, otp, salt);
+        if (entity is null)
+        {
+            entity = new RegistrationOtp(normalizedEmail, hash, salt, now);
+            dbContext.RegistrationOtps.Add(entity);
+        }
+        else entity.Replace(hash, salt, now);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await emailSender.SendRegistrationOtpAsync(email.Trim(), otp, cancellationToken);
+            return Result.Success();
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            entity.AllowImmediateRetry();
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return Result.Failure(IdentityErrors.EmailDeliveryFailed);
+        }
+    }
+
+    public async Task<Result<AuthTokens>> VerifyRegistrationOtpAndRegisterAsync(
+        string email, string otp, string password, string fullName, string phone,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedEmail = email.Trim().ToUpperInvariant();
+        var entity = await dbContext.RegistrationOtps.SingleOrDefaultAsync(x => x.NormalizedEmail == normalizedEmail, cancellationToken);
+        if (entity is null || entity.IsUsed) return Result<AuthTokens>.Failure(IdentityErrors.OtpInvalid);
+        if (entity.ExpiresAtUtc <= DateTime.UtcNow) return Result<AuthTokens>.Failure(IdentityErrors.OtpExpired);
+        if (entity.FailedAttempts >= 5) return Result<AuthTokens>.Failure(IdentityErrors.OtpAttemptsExceeded);
+
+        var actualHash = HashOtp(normalizedEmail, otp.Trim(), entity.Salt);
+        var matches = CryptographicOperations.FixedTimeEquals(
+            Convert.FromBase64String(entity.CodeHash), Convert.FromBase64String(actualHash));
+        if (!matches)
+        {
+            entity.RecordFailure();
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return Result<AuthTokens>.Failure(entity.FailedAttempts >= 5
+                ? IdentityErrors.OtpAttemptsExceeded : IdentityErrors.OtpInvalid);
+        }
+
+        var result = await RegisterAsync(email, password, fullName, phone, cancellationToken);
+        if (!result.IsSuccess) return result;
+        entity.MarkUsed();
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return result;
+    }
 
     public async Task<Result<AuthTokens>> RegisterAsync(
         string email,
@@ -285,6 +349,17 @@ public sealed class IdentityService(
             new JwtSecurityTokenHandler().WriteToken(jwt),
             rawRefreshToken,
             accessTokenExpiresAtUtc);
+    }
+
+    private static string HashOtp(string normalizedEmail, string otp, string salt)
+    {
+        var bytes = Rfc2898DeriveBytes.Pbkdf2(
+            Encoding.UTF8.GetBytes($"{normalizedEmail}:{otp}"),
+            Convert.FromBase64String(salt),
+            100_000,
+            HashAlgorithmName.SHA256,
+            32);
+        return Convert.ToBase64String(bytes);
     }
 
     private async Task RevokeAllRefreshTokensAsync(Guid userId, CancellationToken cancellationToken)

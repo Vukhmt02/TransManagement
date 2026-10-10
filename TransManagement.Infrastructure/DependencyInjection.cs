@@ -37,6 +37,7 @@ public static class DependencyInjection
             .AddEntityFrameworkStores<ApplicationDbContext>();
 
         services.AddScoped<IIdentityService, IdentityService>();
+        services.AddScoped<IEmailSender, GmailEmailSender>();
         services.AddScoped<ITransportService, TransportService>();
 
         return services;

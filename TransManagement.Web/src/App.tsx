@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { getProfile, getStoredTokens, login, logout, register } from './auth'
+import { getProfile, getStoredTokens, login, logout, register, requestRegistrationOtp } from './auth'
 import type { AuthTokens, UserProfile } from './types'
 import Dashboard from './dashboard/Dashboard'
 import LandingPage from './landing/LandingPage'
+import './otp.css'
 
 const MailIcon = () => <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.75h16v10.5H4V6.75Z"/><path d="m4.5 7.25 7.5 6 7.5-6"/></svg>
 const LockIcon = () => <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
@@ -27,6 +28,8 @@ function App() {
   const [email, setEmail] = useState(() => localStorage.getItem('transmanagement.email') ?? '')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [otp, setOtp] = useState('')
+  const [otpSent, setOtpSent] = useState(false)
   const [rememberEmail, setRememberEmail] = useState(Boolean(localStorage.getItem('transmanagement.email')))
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -68,9 +71,19 @@ function App() {
     }
     setLoading(true)
     try {
+      if (mode === 'register' && !otpSent) {
+        await requestRegistrationOtp(email.trim())
+        setOtpSent(true)
+        setError('')
+        return
+      }
+      if (mode === 'register' && !/^\d{6}$/.test(otp)) {
+        setError('Vui lòng nhập đúng mã OTP gồm 6 chữ số được gửi qua email.')
+        return
+      }
       const newTokens = mode === 'login'
         ? await login(email.trim(), password)
-        : await register(fullName.trim(), phone.trim(), email.trim(), password)
+        : await register(fullName.trim(), phone.trim(), email.trim(), password, otp)
       if (rememberEmail) localStorage.setItem('transmanagement.email', email.trim())
       else localStorage.removeItem('transmanagement.email')
       setTokens(newTokens)
@@ -86,6 +99,8 @@ function App() {
     setError('')
     setPassword('')
     setConfirmPassword('')
+    setOtp('')
+    setOtpSent(false)
     setShowPassword(false)
   }
 
@@ -169,9 +184,10 @@ function App() {
                 <div className="password-rules">{passwordRules.map((rule) => <span className={rule.test(password) ? 'passed' : ''} key={rule.label}><i>{rule.test(password) ? '✓' : '·'}</i>{rule.label}</span>)}</div>
                 <label className="field-spaced" htmlFor="confirmPassword">Xác nhận mật khẩu</label>
                 <div className="input-wrap"><span className="input-icon"><LockIcon/></span><input id="confirmPassword" name="confirmPassword" type={showPassword ? 'text' : 'password'} autoComplete="new-password" placeholder="Nhập lại mật khẩu" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} disabled={loading}/></div>
+                {otpSent && <div className="otp-panel"><span>Mã xác thực đã được gửi đến <b>{email}</b>. Mã có hiệu lực trong 5 phút.</span><label htmlFor="otp">Mã OTP</label><input id="otp" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))} disabled={loading}/><button type="button" onClick={async () => { setLoading(true); setError(''); try { await requestRegistrationOtp(email.trim()); setOtp('') } catch (reason) { setError(reason instanceof Error ? reason.message : 'Không thể gửi lại OTP.') } finally { setLoading(false) } }}>Gửi lại mã</button></div>}
               </>}
               {mode === 'login' && <label className="remember-row"><input type="checkbox" checked={rememberEmail} onChange={(event) => setRememberEmail(event.target.checked)}/><span>Ghi nhớ email trên thiết bị này</span></label>}
-              <button className={`primary-button ${mode === 'register' ? 'register-submit' : ''}`} type="submit" disabled={loading}>{loading ? <><i className="spinner"/>{mode === 'login' ? 'Đang xác thực...' : 'Đang tạo tài khoản...'}</> : <>{mode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'} <span>→</span></>}</button>
+              <button className={`primary-button ${mode === 'register' ? 'register-submit' : ''}`} type="submit" disabled={loading}>{loading ? <><i className="spinner"/>{mode === 'login' ? 'Đang xác thực...' : otpSent ? 'Đang xác minh...' : 'Đang gửi OTP...'}</> : <>{mode === 'login' ? 'Đăng nhập' : otpSent ? 'Xác minh và tạo tài khoản' : 'Gửi mã OTP'} <span>→</span></>}</button>
             </form>
             <p className="auth-switch">{mode === 'login' ? 'Chưa có tài khoản?' : 'Đã có tài khoản?'} <button type="button" onClick={() => switchMode(mode === 'login' ? 'register' : 'login')}>{mode === 'login' ? 'Đăng ký ngay' : 'Đăng nhập'}</button></p>
             <div className="security-note"><span>✓</span><p><b>Kết nối được bảo vệ</b><small>Phiên đăng nhập sẽ kết thúc khi bạn đóng trình duyệt.</small></p></div>

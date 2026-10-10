@@ -35,6 +35,8 @@ if (jwtOptions.SecretKey.Length < 32 || jwtOptions.SecretKey.Contains("CHANGE_ME
 
 builder.Services.Configure<JwtOptions>(
     builder.Configuration.GetRequiredSection(JwtOptions.SectionName));
+builder.Services.Configure<EmailOptions>(
+    builder.Configuration.GetSection(EmailOptions.SectionName));
 
 builder.Services
     .AddDataProtection()

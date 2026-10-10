@@ -22,11 +22,23 @@ export async function login(email: string, password: string): Promise<AuthTokens
   return result.data
 }
 
-export async function register(fullName: string, phone: string, email: string, password: string): Promise<AuthTokens> {
+export async function requestRegistrationOtp(email: string): Promise<void> {
+  const response = await fetch('/api/Auth/register/request-otp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  })
+  if (!response.ok) {
+    const problem = (await response.json().catch(() => ({}))) as ProblemDetails
+    throw new Error(problem.detail || 'Không thể gửi mã OTP. Vui lòng thử lại.')
+  }
+}
+
+export async function register(fullName: string, phone: string, email: string, password: string, otp: string): Promise<AuthTokens> {
   const response = await fetch('/api/Auth/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fullName, phone, email, password }),
+    body: JSON.stringify({ fullName, phone, email, password, otp }),
   })
   if (!response.ok) {
     const problem = (await response.json().catch(() => ({}))) as ProblemDetails

@@ -12,14 +12,30 @@ namespace TransManagement.API.Controllers;
 public sealed class AuthController(IIdentityService identityService) : ApiControllerBase
 {
     [AllowAnonymous]
+    [HttpPost("register/request-otp")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> RequestRegistrationOtp(
+        RequestRegistrationOtpRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await identityService.RequestRegistrationOtpAsync(request.Email, cancellationToken);
+        return result.IsSuccess
+            ? NoContent()
+            : ErrorResponse(result.Error,
+                result.Error.Code == "auth.otp_rate_limited" ? StatusCodes.Status429TooManyRequests : StatusCodes.Status400BadRequest,
+                "Could not send verification code");
+    }
+
+    [AllowAnonymous]
     [HttpPost("register")]
     [ProducesResponseType(typeof(ApiResponse<AuthTokens>), StatusCodes.Status201Created)]
     public async Task<IActionResult> Register(
-        RegisterRequest request,
+        VerifyRegistrationOtpRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await identityService.RegisterAsync(
+        var result = await identityService.VerifyRegistrationOtpAndRegisterAsync(
             request.Email,
+            request.Otp,
             request.Password,
             request.FullName,
             request.Phone,

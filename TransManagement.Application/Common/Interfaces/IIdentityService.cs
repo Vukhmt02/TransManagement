@@ -5,6 +5,18 @@ namespace TransManagement.Application.Common.Interfaces;
 
 public interface IIdentityService
 {
+    Task<Result> RequestRegistrationOtpAsync(
+        string email,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<AuthTokens>> VerifyRegistrationOtpAndRegisterAsync(
+        string email,
+        string otp,
+        string password,
+        string fullName,
+        string phone,
+        CancellationToken cancellationToken = default);
+
     Task<Result<AuthTokens>> RegisterAsync(
         string email,
         string password,
