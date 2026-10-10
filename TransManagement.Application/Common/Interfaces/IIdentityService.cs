@@ -39,4 +39,11 @@ public interface IIdentityService
         Guid userId,
         bool isActive,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<UserSummary>> GetUsersAsync(CancellationToken cancellationToken = default);
+
+    Task<Result<UserSummary>> SetUserRolesAsync(
+        Guid userId,
+        IReadOnlyCollection<string> roles,
+        CancellationToken cancellationToken = default);
 }

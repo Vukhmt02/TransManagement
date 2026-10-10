@@ -44,6 +44,15 @@ public sealed class DriversController(ITransportService service) : ApiController
         var result = await service.SetDriverStatusAsync(id, request.Status, cancellationToken);
         return result.IsSuccess ? NoContent() : ErrorResponse(result.Error);
     }
+
+    [Authorize(Roles = AppRoles.Admin)]
+    [HttpPut("{id:guid}/user")]
+    public async Task<IActionResult> LinkUser(Guid id, LinkDriverUserRequest request, CancellationToken cancellationToken)
+    {
+        var result = await service.LinkDriverToUserAsync(id, request.UserId, cancellationToken);
+        return result.IsSuccess ? Ok(ApiResponse<DriverDto>.Ok(result.Value)) : ErrorResponse(result.Error);
+    }
 }
 
 public sealed record SetDriverStatusRequest(DriverStatus Status);
+public sealed record LinkDriverUserRequest(Guid? UserId);

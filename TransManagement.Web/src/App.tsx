@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import { getProfile, getStoredTokens, login, logout, register } from './auth'
 import type { AuthTokens, UserProfile } from './types'
 import Dashboard from './dashboard/Dashboard'
+import LandingPage from './landing/LandingPage'
 
 const MailIcon = () => <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.75h16v10.5H4V6.75Z"/><path d="m4.5 7.25 7.5 6 7.5-6"/></svg>
 const LockIcon = () => <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
@@ -32,6 +33,7 @@ function App() {
   const [error, setError] = useState('')
   const [tokens, setTokens] = useState<AuthTokens | null>(() => getStoredTokens())
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [showLanding, setShowLanding] = useState(true)
 
   useEffect(() => {
     if (!tokens) return
@@ -98,12 +100,19 @@ function App() {
     return <Dashboard accessToken={tokens.accessToken} profile={profile} onLogout={handleLogout}/>
   }
 
+  if (showLanding) {
+    return <LandingPage
+      onLogin={() => { setMode('login'); setShowLanding(false); window.scrollTo(0, 0) }}
+      onRegister={() => { setMode('register'); setShowLanding(false); window.scrollTo(0, 0) }}
+    />
+  }
+
   return (
     <main className="login-shell">
       <section className="story-panel">
         <div className="map-grid" aria-hidden="true" />
         <header className="story-header">
-          <a className="brand" href="#" aria-label="TransFlow - Trang chủ"><TruckLogo /><span>TRANS<span>FLOW</span></span></a>
+          <button className="brand brand-button" type="button" onClick={() => setShowLanding(true)} aria-label="TransFlow - Trang chủ"><TruckLogo /><span>TRANS<span>FLOW</span></span></button>
           <span className="portal-label"><i /> Cổng điều hành</span>
         </header>
 

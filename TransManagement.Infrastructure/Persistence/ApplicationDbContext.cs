@@ -24,6 +24,10 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
 
     public DbSet<RouteStop> RouteStops => Set<RouteStop>();
 
+    public DbSet<ShipmentLocation> ShipmentLocations => Set<ShipmentLocation>();
+
+    public DbSet<DeliveryProof> DeliveryProofs => Set<DeliveryProof>();
+
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

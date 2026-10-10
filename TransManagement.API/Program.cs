@@ -11,6 +11,7 @@ using TransManagement.Application;
 using TransManagement.Infrastructure;
 using TransManagement.Infrastructure.Persistence;
 using TransManagement.Infrastructure.Identity;
+using TransManagement.API.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -66,6 +67,13 @@ builder.Services
 
         options.Events = new JwtBearerEvents
         {
+            OnMessageReceived = context =>
+            {
+                var token = context.Request.Query["access_token"];
+                if (!string.IsNullOrWhiteSpace(token) && context.HttpContext.Request.Path.StartsWithSegments("/hubs/tracking"))
+                    context.Token = token;
+                return Task.CompletedTask;
+            },
             OnTokenValidated = async context =>
             {
                 var userIdValue = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -93,6 +101,7 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddSignalR();
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -160,6 +169,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<TrackingHub>("/hubs/tracking");
 app.MapHealthChecks("/health");
 
 app.Run();

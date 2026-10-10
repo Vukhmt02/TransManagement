@@ -18,4 +18,6 @@ public sealed class ApplicationUser : IdentityUser<Guid>
     public ICollection<RefreshToken> RefreshTokens { get; private set; } = [];
 
     public Customer? Customer { get; private set; }
+
+    public Driver? Driver { get; private set; }
 }

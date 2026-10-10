@@ -11,6 +11,8 @@
 [Dd]ebug/
 [Rr]elease/
 artifacts/
+.build/
+.testbuild/
 
 ## Test results and coverage
 [Tt]est[Rr]esult*/

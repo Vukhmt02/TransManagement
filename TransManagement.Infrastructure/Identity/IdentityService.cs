@@ -209,6 +209,34 @@ public sealed class IdentityService(
         return Result.Success();
     }
 
+    public async Task<IReadOnlyList<UserSummary>> GetUsersAsync(CancellationToken cancellationToken = default)
+    {
+        var users = await userManager.Users.AsNoTracking().OrderBy(x => x.FullName).ToListAsync(cancellationToken);
+        var result = new List<UserSummary>(users.Count);
+        foreach (var user in users)
+            result.Add(new UserSummary(user.Id, user.Email!, user.FullName, user.IsActive, (await userManager.GetRolesAsync(user)).ToArray()));
+        return result;
+    }
+
+    public async Task<Result<UserSummary>> SetUserRolesAsync(Guid userId, IReadOnlyCollection<string> roles, CancellationToken cancellationToken = default)
+    {
+        var normalized = roles.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (normalized.Length == 0 || normalized.Any(role => !AppRoles.All.Contains(role, StringComparer.OrdinalIgnoreCase)))
+            return Result<UserSummary>.Failure(new Error("auth.invalid_roles", "One or more roles are invalid."));
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null) return Result<UserSummary>.Failure(IdentityErrors.UserNotFound);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var current = await userManager.GetRolesAsync(user);
+        var remove = await userManager.RemoveFromRolesAsync(user, current);
+        if (!remove.Succeeded) return Result<UserSummary>.Failure(new Error("auth.user_update_failed", JoinErrors(remove)));
+        var add = await userManager.AddToRolesAsync(user, normalized);
+        if (!add.Succeeded) return Result<UserSummary>.Failure(new Error("auth.user_update_failed", JoinErrors(add)));
+        await userManager.UpdateSecurityStampAsync(user);
+        await RevokeAllRefreshTokensAsync(user.Id, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return Result<UserSummary>.Success(new UserSummary(user.Id, user.Email!, user.FullName, user.IsActive, normalized));
+    }
+
     private async Task<AuthTokens> IssueTokensAsync(
         ApplicationUser user,
         CancellationToken cancellationToken)

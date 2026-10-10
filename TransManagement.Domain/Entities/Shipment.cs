@@ -53,6 +53,8 @@ public sealed class Shipment : AuditableEntity
 
     public ICollection<RouteStop> RouteStops { get; private set; } = [];
 
+    public ICollection<ShipmentLocation> Locations { get; private set; } = [];
+
     public void Assign()
     {
         if (Status != ShipmentStatus.Planned) throw new InvalidOperationException("Shipment is not planned.");

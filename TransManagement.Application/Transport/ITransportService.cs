@@ -17,6 +17,8 @@ public interface ITransportService
     Task<Result<DriverDto>> CreateDriverAsync(CreateDriverCommand command, CancellationToken cancellationToken);
     Task<Result<DriverDto>> UpdateDriverAsync(Guid id, UpdateDriverCommand command, CancellationToken cancellationToken);
     Task<Result> SetDriverStatusAsync(Guid id, DriverStatus status, CancellationToken cancellationToken);
+    Task<Result<DriverDto>> LinkDriverToUserAsync(Guid id, Guid? userId, CancellationToken cancellationToken);
+    Task<Result<DriverDto>> GetDriverByUserIdAsync(Guid userId, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<VehicleDto>> GetVehiclesAsync(VehicleStatus? status, CancellationToken cancellationToken);
     Task<Result<VehicleDto>> GetVehicleAsync(Guid id, CancellationToken cancellationToken);
@@ -29,6 +31,9 @@ public interface ITransportService
     Task<Result<TransportOrderDto>> CreateOrderAsync(CreateTransportOrderCommand command, CancellationToken cancellationToken);
     Task<Result<TransportOrderDto>> UpdateOrderAsync(Guid id, UpdateTransportOrderCommand command, CancellationToken cancellationToken);
     Task<Result> ChangeOrderStatusAsync(Guid id, TransportOrderStatus status, CancellationToken cancellationToken);
+    Task<IReadOnlyList<TransportOrderDto>> GetCustomerOrdersAsync(Guid userId, CancellationToken cancellationToken);
+    Task<Result<TransportOrderDto>> CreateCustomerOrderAsync(Guid userId, CreateCustomerOrderCommand command, CancellationToken cancellationToken);
+    Task<Result> CancelCustomerOrderAsync(Guid userId, Guid orderId, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<ShipmentDto>> GetShipmentsAsync(ShipmentStatus? status, CancellationToken cancellationToken);
     Task<Result<ShipmentDto>> GetShipmentAsync(Guid id, CancellationToken cancellationToken);
@@ -36,4 +41,13 @@ public interface ITransportService
     Task<Result> StartShipmentAsync(Guid id, CancellationToken cancellationToken);
     Task<Result> CompleteShipmentAsync(Guid id, CancellationToken cancellationToken);
     Task<Result> CancelShipmentAsync(Guid id, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ShipmentDto>> GetDriverShipmentsAsync(Guid userId, CancellationToken cancellationToken);
+    Task<Result<ShipmentDto>> GetDriverShipmentAsync(Guid userId, Guid shipmentId, CancellationToken cancellationToken);
+    Task<Result> StartDriverShipmentAsync(Guid userId, Guid shipmentId, CancellationToken cancellationToken);
+    Task<Result> CompleteDriverShipmentAsync(Guid userId, Guid shipmentId, CancellationToken cancellationToken);
+    Task<Result<RouteStopDto>> ArriveAtStopAsync(Guid userId, Guid stopId, ArriveAtStopCommand command, CancellationToken cancellationToken);
+    Task<Result<RouteStopDto>> CompleteStopAsync(Guid userId, Guid stopId, CreateDeliveryProofCommand? proof, CancellationToken cancellationToken);
+    Task<Result<RouteStopDto>> SkipStopAsync(Guid userId, Guid stopId, CancellationToken cancellationToken);
+    Task<Result<ShipmentLocationDto>> AddShipmentLocationAsync(Guid userId, Guid shipmentId, UpdateShipmentLocationCommand command, CancellationToken cancellationToken);
+    Task<Result<IReadOnlyList<ShipmentLocationDto>>> GetShipmentLocationsAsync(Guid shipmentId, CancellationToken cancellationToken);
 }

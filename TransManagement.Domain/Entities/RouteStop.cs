@@ -60,4 +60,37 @@ public sealed class RouteStop : AuditableEntity
     public DateTime? CompletedAtUtc { get; private set; }
 
     public RouteStopStatus Status { get; private set; } = RouteStopStatus.Pending;
+
+    public DeliveryProof? DeliveryProof { get; private set; }
+
+    public void Arrive(decimal latitude, decimal longitude, DateTime arrivedAtUtc)
+    {
+        if (Status != RouteStopStatus.Pending) throw new InvalidOperationException("Only pending stops can be marked as arrived.");
+        ValidateCoordinates(latitude, longitude);
+        Latitude = latitude;
+        Longitude = longitude;
+        ArrivedAtUtc = arrivedAtUtc;
+        Status = RouteStopStatus.Arrived;
+    }
+
+    public void Complete(DateTime completedAtUtc)
+    {
+        if (Status != RouteStopStatus.Arrived) throw new InvalidOperationException("The driver must arrive before completing a stop.");
+        CompletedAtUtc = completedAtUtc;
+        Status = RouteStopStatus.Completed;
+    }
+
+    public void Skip(DateTime completedAtUtc)
+    {
+        if (Status is RouteStopStatus.Completed or RouteStopStatus.Skipped)
+            throw new InvalidOperationException("This stop has already been closed.");
+        CompletedAtUtc = completedAtUtc;
+        Status = RouteStopStatus.Skipped;
+    }
+
+    private static void ValidateCoordinates(decimal latitude, decimal longitude)
+    {
+        if (latitude is < -90 or > 90) throw new ArgumentOutOfRangeException(nameof(latitude));
+        if (longitude is < -180 or > 180) throw new ArgumentOutOfRangeException(nameof(longitude));
+    }
 }

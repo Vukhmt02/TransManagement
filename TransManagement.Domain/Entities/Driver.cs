@@ -45,6 +45,8 @@ public sealed class Driver : AuditableEntity
 
     public DriverStatus Status { get; private set; } = DriverStatus.Available;
 
+    public Guid? UserId { get; private set; }
+
     public ICollection<Shipment> Shipments { get; private set; } = [];
 
     public void Update(
@@ -67,4 +69,10 @@ public sealed class Driver : AuditableEntity
     }
 
     public void SetStatus(DriverStatus status) => Status = status;
+
+    public void LinkToUser(Guid? userId)
+    {
+        if (userId == Guid.Empty) throw new ArgumentException("User ID is invalid.", nameof(userId));
+        UserId = userId;
+    }
 }

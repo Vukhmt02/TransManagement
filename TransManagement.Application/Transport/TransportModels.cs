@@ -9,7 +9,7 @@ public sealed record CustomerDto(
 public sealed record DriverDto(
     Guid Id, string EmployeeCode, string FullName, string Phone,
     string LicenseNumber, string LicenseClass, DateOnly LicenseExpiryDate,
-    DriverStatus Status);
+    DriverStatus Status, Guid? UserId);
 
 public sealed record VehicleDto(
     Guid Id, string LicensePlate, string VehicleType, decimal MaxLoadKg,
@@ -29,11 +29,25 @@ public sealed record ShipmentDto(
     Guid Id, string Code, Guid VehicleId, string LicensePlate,
     Guid DriverId, string DriverName, DateTime PlannedDepartureAtUtc,
     DateTime? StartedAtUtc, DateTime? CompletedAtUtc, ShipmentStatus Status,
-    IReadOnlyList<ShipmentOrderDto> Orders);
+    IReadOnlyList<ShipmentOrderDto> Orders, IReadOnlyList<RouteStopDto> RouteStops,
+    ShipmentLocationDto? LatestLocation);
 
 public sealed record ShipmentOrderDto(
     Guid OrderId, string OrderCode, int Sequence, string PickupAddress,
     string DeliveryAddress, TransportOrderStatus Status);
+
+public sealed record RouteStopDto(
+    Guid Id, Guid ShipmentId, Guid? TransportOrderId, RouteStopType Type, int Sequence,
+    string Address, decimal? Latitude, decimal? Longitude, DateTime? ArrivedAtUtc,
+    DateTime? CompletedAtUtc, RouteStopStatus Status, DeliveryProofDto? DeliveryProof);
+
+public sealed record ShipmentLocationDto(
+    Guid Id, Guid ShipmentId, decimal Latitude, decimal Longitude,
+    decimal? SpeedKph, decimal? AccuracyMeters, DateTime RecordedAtUtc);
+
+public sealed record DeliveryProofDto(
+    Guid Id, Guid RouteStopId, string ReceiverName, string? PhotoUrl,
+    string? SignatureData, string? Note, DateTime CapturedAtUtc);
 
 public sealed record CreateCustomerCommand(
     string Code, string Name, string Phone, string? Email,
@@ -77,3 +91,18 @@ public sealed record UpdateTransportOrderCommand(
 public sealed record CreateShipmentCommand(
     string Code, Guid VehicleId, Guid DriverId,
     DateTime PlannedDepartureAtUtc, IReadOnlyList<Guid> OrderIds);
+
+public sealed record CreateCustomerOrderCommand(
+    string PickupAddress, string DeliveryAddress, string GoodsDescription,
+    decimal WeightKg, int PackageCount, decimal? VolumeM3,
+    DateTime? ExpectedPickupAtUtc, DateTime? ExpectedDeliveryAtUtc,
+    string? SenderName, string? SenderPhone, string? RecipientName,
+    string? RecipientPhone, string? Note);
+
+public sealed record UpdateShipmentLocationCommand(
+    decimal Latitude, decimal Longitude, decimal? SpeedKph, decimal? AccuracyMeters);
+
+public sealed record ArriveAtStopCommand(decimal Latitude, decimal Longitude);
+
+public sealed record CreateDeliveryProofCommand(
+    string ReceiverName, string? PhotoUrl, string? SignatureData, string? Note);

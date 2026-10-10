@@ -30,6 +30,11 @@ public sealed class RouteStopConfiguration : AuditableEntityConfiguration<RouteS
             .WithMany(order => order.RouteStops)
             .HasForeignKey(stop => stop.TransportOrderId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne(stop => stop.DeliveryProof)
+            .WithOne(proof => proof.RouteStop)
+            .HasForeignKey<DeliveryProof>(proof => proof.RouteStopId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
 

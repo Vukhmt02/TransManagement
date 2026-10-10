@@ -52,4 +52,11 @@ public sealed class ShipmentsController(ITransportService service) : ApiControll
         var result = await service.CancelShipmentAsync(id, cancellationToken);
         return result.IsSuccess ? NoContent() : ErrorResponse(result.Error);
     }
+
+    [HttpGet("{id:guid}/locations")]
+    public async Task<IActionResult> GetLocations(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await service.GetShipmentLocationsAsync(id, cancellationToken);
+        return result.IsSuccess ? Ok(ApiResponse<IReadOnlyList<ShipmentLocationDto>>.Ok(result.Value)) : ErrorResponse(result.Error);
+    }
 }

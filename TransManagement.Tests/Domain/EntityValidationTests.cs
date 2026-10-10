@@ -86,4 +86,30 @@ public sealed class EntityValidationTests
         Assert.Equal(userId, customer.UserId);
         Assert.Throws<InvalidOperationException>(() => customer.LinkToUser(Guid.NewGuid()));
     }
+
+    [Fact]
+    public void RouteStop_ShouldRequireArrivalBeforeCompletion()
+    {
+        var stop = new RouteStop(Guid.NewGuid(), RouteStopType.Delivery, 1, "Delivery address");
+
+        Assert.Throws<InvalidOperationException>(() => stop.Complete(DateTime.UtcNow));
+        stop.Arrive(10.7769m, 106.7009m, DateTime.UtcNow);
+        stop.Complete(DateTime.UtcNow.AddMinutes(5));
+
+        Assert.Equal(RouteStopStatus.Completed, stop.Status);
+    }
+
+    [Fact]
+    public void ShipmentLocation_ShouldRejectInvalidCoordinates()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new ShipmentLocation(Guid.NewGuid(), Guid.NewGuid(), 91, 106.7m, null, null, DateTime.UtcNow));
+    }
+
+    [Fact]
+    public void DeliveryProof_ShouldRequirePhotoOrSignature()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new DeliveryProof(Guid.NewGuid(), "Receiver", null, null, null, DateTime.UtcNow));
+    }
 }

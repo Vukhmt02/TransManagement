@@ -112,6 +112,28 @@ public sealed class TransportService(ApplicationDbContext dbContext) : ITranspor
         return Result.Success();
     }
 
+    public async Task<Result<DriverDto>> LinkDriverToUserAsync(Guid id, Guid? userId, CancellationToken cancellationToken)
+    {
+        var entity = await dbContext.Drivers.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (entity is null) return Result<DriverDto>.Failure(NotFound);
+        if (userId.HasValue)
+        {
+            var userExists = await dbContext.Users.AnyAsync(x => x.Id == userId && x.IsActive, cancellationToken);
+            var alreadyLinked = await dbContext.Drivers.AnyAsync(x => x.Id != id && x.UserId == userId, cancellationToken);
+            if (!userExists) return Result<DriverDto>.Failure(NotFound);
+            if (alreadyLinked) return Result<DriverDto>.Failure(Conflict);
+        }
+        entity.LinkToUser(userId);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Result<DriverDto>.Success(Map(entity));
+    }
+
+    public async Task<Result<DriverDto>> GetDriverByUserIdAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var entity = await dbContext.Drivers.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+        return entity is null ? Result<DriverDto>.Failure(NotFound) : Result<DriverDto>.Success(Map(entity));
+    }
+
     public async Task<IReadOnlyList<VehicleDto>> GetVehiclesAsync(VehicleStatus? status, CancellationToken cancellationToken)
     {
         var query = dbContext.Vehicles.AsNoTracking();
@@ -207,6 +229,36 @@ public sealed class TransportService(ApplicationDbContext dbContext) : ITranspor
         return Result.Success();
     }
 
+    public async Task<IReadOnlyList<TransportOrderDto>> GetCustomerOrdersAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        return (await dbContext.TransportOrders.AsNoTracking().Include(x => x.Customer)
+            .Where(x => x.Customer.UserId == userId)
+            .OrderByDescending(x => x.CreatedAtUtc).ToListAsync(cancellationToken)).Select(Map).ToList();
+    }
+
+    public async Task<Result<TransportOrderDto>> CreateCustomerOrderAsync(Guid userId, CreateCustomerOrderCommand command, CancellationToken cancellationToken)
+    {
+        var customer = await dbContext.Customers.SingleOrDefaultAsync(x => x.UserId == userId && x.IsActive, cancellationToken);
+        if (customer is null) return Result<TransportOrderDto>.Failure(new Error("Transport.CustomerUnavailable", "The account is not linked to an active customer."));
+        var code = $"WEB-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid().ToString("N")[..4].ToUpperInvariant()}";
+        var create = new CreateTransportOrderCommand(code, customer.Id, command.PickupAddress, command.DeliveryAddress,
+            command.GoodsDescription, command.WeightKg, command.PackageCount, command.VolumeM3,
+            command.ExpectedPickupAtUtc, command.ExpectedDeliveryAtUtc, null, command.SenderName,
+            command.SenderPhone, command.RecipientName, command.RecipientPhone, command.Note);
+        return await CreateOrderAsync(create, cancellationToken);
+    }
+
+    public async Task<Result> CancelCustomerOrderAsync(Guid userId, Guid orderId, CancellationToken cancellationToken)
+    {
+        var entity = await dbContext.TransportOrders.Include(x => x.Customer)
+            .SingleOrDefaultAsync(x => x.Id == orderId && x.Customer.UserId == userId, cancellationToken);
+        if (entity is null) return Result.Failure(NotFound);
+        try { entity.ChangeStatus(TransportOrderStatus.Cancelled); }
+        catch (InvalidOperationException) { return Result.Failure(Invalid); }
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Result.Success();
+    }
+
     public async Task<IReadOnlyList<ShipmentDto>> GetShipmentsAsync(ShipmentStatus? status, CancellationToken cancellationToken)
     {
         var query = ShipmentQuery();
@@ -284,13 +336,118 @@ public sealed class TransportService(ApplicationDbContext dbContext) : ITranspor
             shipment.Driver.SetStatus(DriverStatus.Available);
             foreach (var item in shipment.ShipmentOrders)
             {
-                item.TransportOrder.ChangeStatus(TransportOrderStatus.Delivered);
-                item.TransportOrder.ChangeStatus(TransportOrderStatus.Completed);
+                if (item.TransportOrder.Status == TransportOrderStatus.InTransit)
+                    item.TransportOrder.ChangeStatus(TransportOrderStatus.Delivered);
+                if (item.TransportOrder.Status == TransportOrderStatus.Delivered)
+                    item.TransportOrder.ChangeStatus(TransportOrderStatus.Completed);
             }
         }
         catch (InvalidOperationException) { return Result.Failure(Invalid); }
         await dbContext.SaveChangesAsync(cancellationToken);
         return Result.Success();
+    }
+
+    public async Task<IReadOnlyList<ShipmentDto>> GetDriverShipmentsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        return (await ShipmentQuery().Where(x => x.Driver.UserId == userId)
+            .OrderByDescending(x => x.PlannedDepartureAtUtc).ToListAsync(cancellationToken)).Select(Map).ToList();
+    }
+
+    public async Task<Result<ShipmentDto>> GetDriverShipmentAsync(Guid userId, Guid shipmentId, CancellationToken cancellationToken)
+    {
+        var entity = await ShipmentQuery().SingleOrDefaultAsync(x => x.Id == shipmentId && x.Driver.UserId == userId, cancellationToken);
+        return entity is null ? Result<ShipmentDto>.Failure(NotFound) : Result<ShipmentDto>.Success(Map(entity));
+    }
+
+    public async Task<Result> StartDriverShipmentAsync(Guid userId, Guid shipmentId, CancellationToken cancellationToken)
+    {
+        if (!await IsDriversShipment(userId, shipmentId, cancellationToken)) return Result.Failure(NotFound);
+        return await StartShipmentAsync(shipmentId, cancellationToken);
+    }
+
+    public async Task<Result> CompleteDriverShipmentAsync(Guid userId, Guid shipmentId, CancellationToken cancellationToken)
+    {
+        if (!await IsDriversShipment(userId, shipmentId, cancellationToken)) return Result.Failure(NotFound);
+        var hasOpenStops = await dbContext.RouteStops.AnyAsync(x => x.ShipmentId == shipmentId &&
+            x.Status != RouteStopStatus.Completed && x.Status != RouteStopStatus.Skipped, cancellationToken);
+        if (hasOpenStops) return Result.Failure(Invalid);
+        return await CompleteShipmentAsync(shipmentId, cancellationToken);
+    }
+
+    public async Task<Result<RouteStopDto>> ArriveAtStopAsync(Guid userId, Guid stopId, ArriveAtStopCommand command, CancellationToken cancellationToken)
+    {
+        var stop = await DriverStopQuery(userId).SingleOrDefaultAsync(x => x.Id == stopId, cancellationToken);
+        if (stop is null) return Result<RouteStopDto>.Failure(NotFound);
+        if (stop.Shipment.Status != ShipmentStatus.Started) return Result<RouteStopDto>.Failure(Invalid);
+        if (await dbContext.RouteStops.AnyAsync(x => x.ShipmentId == stop.ShipmentId && x.Sequence < stop.Sequence &&
+            x.Status != RouteStopStatus.Completed && x.Status != RouteStopStatus.Skipped, cancellationToken))
+            return Result<RouteStopDto>.Failure(Invalid);
+        try { stop.Arrive(command.Latitude, command.Longitude, DateTime.UtcNow); }
+        catch (InvalidOperationException) { return Result<RouteStopDto>.Failure(Invalid); }
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Result<RouteStopDto>.Success(Map(stop));
+    }
+
+    public async Task<Result<RouteStopDto>> CompleteStopAsync(Guid userId, Guid stopId, CreateDeliveryProofCommand? proof, CancellationToken cancellationToken)
+    {
+        var stop = await DriverStopQuery(userId).SingleOrDefaultAsync(x => x.Id == stopId, cancellationToken);
+        if (stop is null) return Result<RouteStopDto>.Failure(NotFound);
+        if (stop.Type == RouteStopType.Delivery && proof is null) return Result<RouteStopDto>.Failure(Invalid);
+        try
+        {
+            if (proof is not null)
+                dbContext.DeliveryProofs.Add(new DeliveryProof(stop.Id, proof.ReceiverName, proof.PhotoUrl, proof.SignatureData, proof.Note, DateTime.UtcNow));
+            stop.Complete(DateTime.UtcNow);
+            if (stop.Type == RouteStopType.Delivery && stop.TransportOrder?.Status == TransportOrderStatus.InTransit)
+                stop.TransportOrder.ChangeStatus(TransportOrderStatus.Delivered);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            return Result<RouteStopDto>.Failure(Invalid);
+        }
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Result<RouteStopDto>.Success(Map(stop));
+    }
+
+    public async Task<Result<RouteStopDto>> SkipStopAsync(Guid userId, Guid stopId, CancellationToken cancellationToken)
+    {
+        var stop = await DriverStopQuery(userId).SingleOrDefaultAsync(x => x.Id == stopId, cancellationToken);
+        if (stop is null) return Result<RouteStopDto>.Failure(NotFound);
+        try
+        {
+            stop.Skip(DateTime.UtcNow);
+            if (stop.Type == RouteStopType.Delivery && stop.TransportOrder?.Status == TransportOrderStatus.InTransit)
+                stop.TransportOrder.ChangeStatus(TransportOrderStatus.DeliveryFailed);
+        }
+        catch (InvalidOperationException) { return Result<RouteStopDto>.Failure(Invalid); }
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Result<RouteStopDto>.Success(Map(stop));
+    }
+
+    public async Task<Result<ShipmentLocationDto>> AddShipmentLocationAsync(Guid userId, Guid shipmentId, UpdateShipmentLocationCommand command, CancellationToken cancellationToken)
+    {
+        var shipment = await dbContext.Shipments.Include(x => x.Driver)
+            .SingleOrDefaultAsync(x => x.Id == shipmentId && x.Driver.UserId == userId, cancellationToken);
+        if (shipment is null) return Result<ShipmentLocationDto>.Failure(NotFound);
+        if (shipment.Status != ShipmentStatus.Started) return Result<ShipmentLocationDto>.Failure(Invalid);
+        try
+        {
+            var location = new ShipmentLocation(shipmentId, shipment.DriverId, command.Latitude, command.Longitude,
+                command.SpeedKph, command.AccuracyMeters, DateTime.UtcNow);
+            dbContext.ShipmentLocations.Add(location);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return Result<ShipmentLocationDto>.Success(Map(location));
+        }
+        catch (ArgumentOutOfRangeException) { return Result<ShipmentLocationDto>.Failure(Invalid); }
+    }
+
+    public async Task<Result<IReadOnlyList<ShipmentLocationDto>>> GetShipmentLocationsAsync(Guid shipmentId, CancellationToken cancellationToken)
+    {
+        if (!await dbContext.Shipments.AnyAsync(x => x.Id == shipmentId, cancellationToken))
+            return Result<IReadOnlyList<ShipmentLocationDto>>.Failure(NotFound);
+        var items = await dbContext.ShipmentLocations.AsNoTracking().Where(x => x.ShipmentId == shipmentId)
+            .OrderByDescending(x => x.RecordedAtUtc).Take(200).ToListAsync(cancellationToken);
+        return Result<IReadOnlyList<ShipmentLocationDto>>.Success(items.Select(Map).ToList());
     }
 
     public async Task<Result> CancelShipmentAsync(Guid id, CancellationToken cancellationToken)
@@ -311,11 +468,24 @@ public sealed class TransportService(ApplicationDbContext dbContext) : ITranspor
 
     private IQueryable<Shipment> ShipmentQuery() => dbContext.Shipments.AsNoTracking()
         .Include(x => x.Vehicle).Include(x => x.Driver)
-        .Include(x => x.ShipmentOrders).ThenInclude(x => x.TransportOrder);
+        .Include(x => x.ShipmentOrders).ThenInclude(x => x.TransportOrder)
+        .Include(x => x.RouteStops).ThenInclude(x => x.DeliveryProof)
+        .Include(x => x.Locations);
+
+    private Task<bool> IsDriversShipment(Guid userId, Guid shipmentId, CancellationToken cancellationToken) =>
+        dbContext.Shipments.AnyAsync(x => x.Id == shipmentId && x.Driver.UserId == userId, cancellationToken);
+
+    private IQueryable<RouteStop> DriverStopQuery(Guid userId) => dbContext.RouteStops
+        .Include(x => x.Shipment).ThenInclude(x => x.Driver)
+        .Include(x => x.TransportOrder).Include(x => x.DeliveryProof)
+        .Where(x => x.Shipment.Driver.UserId == userId);
 
     private static CustomerDto Map(Customer x) => new(x.Id, x.Code, x.Name, x.Phone, x.Email, x.TaxCode, x.Address, x.IsActive, x.UserId);
-    private static DriverDto Map(Driver x) => new(x.Id, x.EmployeeCode, x.FullName, x.Phone, x.LicenseNumber, x.LicenseClass, x.LicenseExpiryDate, x.Status);
+    private static DriverDto Map(Driver x) => new(x.Id, x.EmployeeCode, x.FullName, x.Phone, x.LicenseNumber, x.LicenseClass, x.LicenseExpiryDate, x.Status, x.UserId);
     private static VehicleDto Map(Vehicle x) => new(x.Id, x.LicensePlate, x.VehicleType, x.MaxLoadKg, x.CargoVolumeM3, x.RegistrationExpiryDate, x.InsuranceExpiryDate, x.Status);
     private static TransportOrderDto Map(TransportOrder x) => new(x.Id, x.Code, x.CustomerId, x.Customer.Name, x.PickupAddress, x.DeliveryAddress, x.GoodsDescription, x.WeightKg, x.VolumeM3, x.PackageCount, x.ExpectedPickupAtUtc, x.ExpectedDeliveryAtUtc, x.EstimatedPrice, x.SenderName, x.SenderPhone, x.RecipientName, x.RecipientPhone, x.Note, x.Status);
-    private static ShipmentDto Map(Shipment x) => new(x.Id, x.Code, x.VehicleId, x.Vehicle.LicensePlate, x.DriverId, x.Driver.FullName, x.PlannedDepartureAtUtc, x.StartedAtUtc, x.CompletedAtUtc, x.Status, x.ShipmentOrders.OrderBy(y => y.Sequence).Select(y => new ShipmentOrderDto(y.TransportOrderId, y.TransportOrder.Code, y.Sequence, y.TransportOrder.PickupAddress, y.TransportOrder.DeliveryAddress, y.TransportOrder.Status)).ToList());
+    private static ShipmentDto Map(Shipment x) => new(x.Id, x.Code, x.VehicleId, x.Vehicle.LicensePlate, x.DriverId, x.Driver.FullName, x.PlannedDepartureAtUtc, x.StartedAtUtc, x.CompletedAtUtc, x.Status, x.ShipmentOrders.OrderBy(y => y.Sequence).Select(y => new ShipmentOrderDto(y.TransportOrderId, y.TransportOrder.Code, y.Sequence, y.TransportOrder.PickupAddress, y.TransportOrder.DeliveryAddress, y.TransportOrder.Status)).ToList(), x.RouteStops.OrderBy(y => y.Sequence).Select(Map).ToList(), x.Locations.OrderByDescending(y => y.RecordedAtUtc).Select(Map).FirstOrDefault());
+    private static RouteStopDto Map(RouteStop x) => new(x.Id, x.ShipmentId, x.TransportOrderId, x.Type, x.Sequence, x.Address, x.Latitude, x.Longitude, x.ArrivedAtUtc, x.CompletedAtUtc, x.Status, x.DeliveryProof is null ? null : Map(x.DeliveryProof));
+    private static ShipmentLocationDto Map(ShipmentLocation x) => new(x.Id, x.ShipmentId, x.Latitude, x.Longitude, x.SpeedKph, x.AccuracyMeters, x.RecordedAtUtc);
+    private static DeliveryProofDto Map(DeliveryProof x) => new(x.Id, x.RouteStopId, x.ReceiverName, x.PhotoUrl, x.SignatureData, x.Note, x.CapturedAtUtc);
 }

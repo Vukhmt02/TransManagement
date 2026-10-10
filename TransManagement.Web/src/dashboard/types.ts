@@ -18,6 +18,7 @@ export interface Driver {
   licenseClass: string
   licenseExpiryDate: string
   status: string
+  userId?: string
 }
 
 export interface Vehicle {
@@ -74,6 +75,43 @@ export interface Shipment {
   completedAtUtc?: string
   status: string
   orders: ShipmentOrder[]
+  routeStops: RouteStop[]
+  latestLocation?: ShipmentLocation
+}
+
+export interface DeliveryProof {
+  id: string
+  routeStopId: string
+  receiverName: string
+  photoUrl?: string
+  signatureData?: string
+  note?: string
+  capturedAtUtc: string
+}
+
+export interface RouteStop {
+  id: string
+  shipmentId: string
+  transportOrderId?: string
+  type: 'Pickup' | 'Delivery'
+  sequence: number
+  address: string
+  latitude?: number
+  longitude?: number
+  arrivedAtUtc?: string
+  completedAtUtc?: string
+  status: 'Pending' | 'Arrived' | 'Completed' | 'Skipped'
+  deliveryProof?: DeliveryProof
+}
+
+export interface ShipmentLocation {
+  id: string
+  shipmentId: string
+  latitude: number
+  longitude: number
+  speedKph?: number
+  accuracyMeters?: number
+  recordedAtUtc: string
 }
 
 export interface DashboardData {
