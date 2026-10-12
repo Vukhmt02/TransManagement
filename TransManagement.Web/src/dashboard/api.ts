@@ -1,6 +1,6 @@
 import type { ApiResponse, ProblemDetails } from '../types'
 import { authFetch } from '../auth'
-import type { Customer, DashboardData, Driver, Shipment, TransportOrder, Vehicle } from './types'
+import type { Customer, DashboardData, Driver, Shipment, ShipmentLocation, TransportOrder, Vehicle } from './types'
 
 async function get<T>(path: string, accessToken: string): Promise<T> {
   const response = await authFetch(path, {}, accessToken)
@@ -61,4 +61,6 @@ export const managementApi = {
   createShipment: (token: string, body: unknown) => mutate('/api/Shipments', token, 'POST', body),
   shipmentAction: (token: string, id: string, action: 'start' | 'complete' | 'cancel') =>
     mutate(`/api/Shipments/${id}/${action}`, token, 'POST'),
+  shipmentLocations: (token: string, id: string) =>
+    get<ShipmentLocation[]>(`/api/Shipments/${id}/locations`, token),
 }

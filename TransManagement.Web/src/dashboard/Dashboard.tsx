@@ -7,6 +7,7 @@ import { CustomerPortal, DriverPortal } from '../portal/Portals'
 import './dashboard.css'
 import './management-dashboard.css'
 import './dashboard-large-type.css'
+import FleetTrackingMap from './FleetTrackingMap'
 
 interface DashboardProps {
   accessToken: string
@@ -156,7 +157,7 @@ export default function Dashboard({ accessToken, profile, onLogout }: DashboardP
       <main className="dashboard-content">
         <div className={`page-heading ${section === 'overview' ? 'overview-heading' : ''}`}><div><p>{new Intl.DateTimeFormat('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())}</p><h1>{section === 'overview' ? `Chào buổi sáng, ${profile.fullName.split(' ').slice(-1)[0]}!` : current.title}</h1><span>{section === 'overview' ? 'Tổng quan tình hình vận hành đội xe của bạn.' : current.subtitle}</span></div><button className="refresh-button" onClick={() => void loadData()} disabled={loading}><Icon name="refresh"/>{loading ? 'Đang tải...' : section === 'overview' ? '7 ngày gần nhất' : 'Làm mới'}</button></div>
         {error && <div className="dashboard-error"><b>Không thể cập nhật dữ liệu</b><span>{error}</span><button onClick={() => void loadData()}>Thử lại</button></div>}
-        {loading ? <DashboardSkeleton/> : <SectionContent section={section} data={data} search={search} onEdit={(kind, entity) => setModal({ kind, entity })} onCreate={(kind) => setModal({ kind })} onConfirm={setPending}/>} 
+        {loading ? <DashboardSkeleton/> : <SectionContent accessToken={accessToken} section={section} data={data} search={search} onEdit={(kind, entity) => setModal({ kind, entity })} onCreate={(kind) => setModal({ kind })} onConfirm={setPending}/>}
       </main>
     </div>
     {modal && <ManagementModal {...modal} data={data} accessToken={accessToken} onClose={() => setModal(null)} onDone={completed}/>} 
@@ -170,6 +171,7 @@ function DashboardSkeleton() {
 }
 
 interface SectionProps {
+  accessToken: string
   section: DashboardSection
   data: DashboardData
   search: string
@@ -178,7 +180,7 @@ interface SectionProps {
   onConfirm: (action: { type: 'customer-toggle' | 'order-cancel' | 'shipment-start' | 'shipment-complete' | 'shipment-cancel'; id: string; name: string; nextValue?: boolean }) => void
 }
 
-function SectionContent({ section, data, search, onEdit, onCreate, onConfirm }: SectionProps) {
+function SectionContent({ accessToken, section, data, search, onEdit, onCreate, onConfirm }: SectionProps) {
   const term = search.trim().toLocaleLowerCase('vi')
   const includes = (...values: (string | undefined)[]) => !term || values.some((value) => value?.toLocaleLowerCase('vi').includes(term))
   const orders = useMemo(() => data.orders.filter((x) => includes(x.code, x.customerName, x.pickupAddress, x.deliveryAddress, statusLabels[x.status])), [data.orders, term])
@@ -187,7 +189,7 @@ function SectionContent({ section, data, search, onEdit, onCreate, onConfirm }: 
   const drivers = data.drivers.filter((x) => includes(x.employeeCode, x.fullName, x.phone, x.licenseNumber, statusLabels[x.status]))
   const vehicles = data.vehicles.filter((x) => includes(x.licensePlate, x.vehicleType, statusLabels[x.status]))
 
-  if (section === 'overview') return <ManagementOverview data={data}/>
+  if (section === 'overview') return <ManagementOverview data={data} accessToken={accessToken}/>
   if (section === 'orders') return <DataPanel count={orders.length} label="đơn vận chuyển" actionLabel="Tạo đơn" onAction={() => onCreate('order')}><table><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Hành trình</th><th>Khối lượng</th><th>Giá dự kiến</th><th>Trạng thái</th><th/></tr></thead><tbody>{orders.map((x) => <tr key={x.id}><td><b className="code">{x.code}</b></td><td>{x.customerName}</td><td><div className="route-cell"><span>{x.pickupAddress}</span><i>→</i><span>{x.deliveryAddress}</span></div></td><td>{x.weightKg.toLocaleString('vi-VN')} kg</td><td>{money(x.estimatedPrice)}</td><td>{status(x.status)}</td><td><div className="row-actions">{['Draft','WaitingForAssignment'].includes(x.status) && <button onClick={() => onEdit('order', x)}>Sửa</button>}{['Draft','WaitingForAssignment'].includes(x.status) && <button className="danger" onClick={() => onConfirm({ type: 'order-cancel', id: x.id, name: x.code })}>Hủy</button>}</div></td></tr>)}</tbody></table></DataPanel>
   if (section === 'shipments') return <DataPanel count={shipments.length} label="chuyến xe" actionLabel="Tạo chuyến" onAction={() => onCreate('shipment')}><table><thead><tr><th>Mã chuyến</th><th>Phương tiện</th><th>Tài xế</th><th>Khởi hành</th><th>Số đơn</th><th>Trạng thái</th><th/></tr></thead><tbody>{shipments.map((x) => <tr key={x.id}><td><b className="code">{x.code}</b></td><td><b>{x.licensePlate}</b></td><td>{x.driverName}</td><td>{dateTime(x.plannedDepartureAtUtc)}</td><td>{x.orders.length} đơn</td><td>{status(x.status)}</td><td><ShipmentActions value={x} onConfirm={onConfirm}/></td></tr>)}</tbody></table></DataPanel>
   if (section === 'customers') return <DataPanel count={customers.length} label="khách hàng" actionLabel="Thêm khách hàng" onAction={() => onCreate('customer')}><table><thead><tr><th>Mã KH</th><th>Khách hàng</th><th>Liên hệ</th><th>Địa chỉ</th><th>Trạng thái</th><th/></tr></thead><tbody>{customers.map((x) => <tr key={x.id}><td><b className="code">{x.code}</b></td><td><b>{x.name}</b><small>{x.taxCode || 'Chưa có mã số thuế'}</small></td><td>{x.phone}<small>{x.email || '—'}</small></td><td className="truncate-cell">{x.address || '—'}</td><td>{status(x.isActive ? 'Active' : 'Inactive')}</td><td><div className="row-actions"><button onClick={() => onEdit('customer', x)}>Sửa</button><button className={x.isActive ? 'danger' : ''} onClick={() => onConfirm({ type: 'customer-toggle', id: x.id, name: x.name, nextValue: !x.isActive })}>{x.isActive ? 'Khóa' : 'Mở'}</button></div></td></tr>)}</tbody></table></DataPanel>
@@ -207,14 +209,13 @@ function ShipmentActions({ value, onConfirm }: { value: Shipment; onConfirm: Sec
   </div>
 }
 
-function ManagementOverview({ data }: { data: DashboardData }) {
+function ManagementOverview({ data, accessToken }: { data: DashboardData; accessToken: string }) {
   const activeTrips = data.shipments.filter(x => x.status === 'Started').length
   const maintenance = data.vehicles.filter(x => x.status === 'Maintenance').length
   const available = data.vehicles.filter(x => x.status === 'Available').length
   const completed = data.orders.filter(x => x.status === 'Completed').length
   const completionRate = data.orders.length ? Math.round(completed / data.orders.length * 100) : 0
   const topDrivers = data.drivers.slice(0, 5)
-  const tracked = data.shipments.filter(x => x.latestLocation)
 
   return <div className="manage-overview">
     <section className="manage-stats">
@@ -231,7 +232,7 @@ function ManagementOverview({ data }: { data: DashboardData }) {
       <article className="analytics-card top-drivers"><header><b>Tài xế nổi bật</b><button>Chi tiết</button></header>{topDrivers.length ? topDrivers.map((driver,index)=><div className="driver-rank" key={driver.id}><span>{driver.fullName.charAt(0)}</span><div><b>{driver.fullName}</b><small>{driver.employeeCode} · Hạng {driver.licenseClass}</small></div><strong>{Math.max(80, 96-index*3)}</strong></div>) : <p className="manage-empty">Chưa có tài xế.</p>}</article>
     </section>
 
-    <section className="analytics-card live-map"><header><b>Bản đồ hành trình trực tiếp</b><button>Xem chi tiết</button></header><div className="map-canvas"><div className="map-road road-one"/><div className="map-road road-two"/><div className="map-road road-three"/>{tracked.length ? tracked.slice(0,6).map((shipment,index)=><a key={shipment.id} className="map-vehicle" style={{left:`${16+index*14}%`,top:`${25+(index%3)*23}%`}} target="_blank" rel="noreferrer" href={`https://www.openstreetmap.org/?mlat=${shipment.latestLocation!.latitude}&mlon=${shipment.latestLocation!.longitude}`} title={`${shipment.code} - ${shipment.licensePlate}`}><Icon name="truck"/></a>) : <div className="map-placeholder"><Icon name="route"/><b>Chưa có vị trí GPS mới</b><span>Vị trí xe sẽ xuất hiện khi tài xế cập nhật hành trình.</span></div>}</div></section>
+    <FleetTrackingMap accessToken={accessToken} shipments={data.shipments}/>
     <section className="manage-bottom"><article className="analytics-card"><header><b>Hiệu suất giao hàng</b><strong>{completionRate}%</strong></header><div className="progress-track"><i style={{width:`${completionRate}%`}}/></div><small>{completed}/{data.orders.length} đơn đã hoàn thành</small></article><article className="analytics-card"><header><b>Đơn chờ phân công</b><strong>{data.orders.filter(x=>x.status==='WaitingForAssignment').length}</strong></header><small>Cần điều phối phương tiện và tài xế</small></article></section>
   </div>
 }
