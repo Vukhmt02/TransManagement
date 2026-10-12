@@ -19,7 +19,16 @@ const optionalNumber = (form: FormData, name: string) => text(form, name) ? numb
 const optionalText = (form: FormData, name: string) => text(form, name) || null
 const utc = (form: FormData, name: string) => text(form, name) ? new Date(text(form, name)).toISOString() : null
 const inputDate = (value?: string) => value ? value.slice(0, 10) : ''
-const inputDateTime = (value?: string) => value ? new Date(value).toISOString().slice(0, 16) : ''
+const inputDateTime = (value?: string) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+
+  // datetime-local does not understand UTC offsets. Shift the instant to the
+  // browser's local clock before producing the YYYY-MM-DDTHH:mm value.
+  const localTime = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+  return localTime.toISOString().slice(0, 16)
+}
 
 const labels: Record<ModalKind, string> = {
   customer: 'khách hàng', driver: 'tài xế', vehicle: 'phương tiện',
