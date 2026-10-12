@@ -1,18 +1,30 @@
 using System.Net;
 using System.Net.Mail;
+using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TransManagement.Application.Common.Interfaces;
 
 namespace TransManagement.Infrastructure.Identity;
 
-public sealed class GmailEmailSender(IOptions<EmailOptions> options) : IEmailSender
+public sealed class GmailEmailSender(
+    IOptions<EmailOptions> options,
+    ILogger<GmailEmailSender> logger) : IEmailSender
 {
     private readonly EmailOptions _options = options.Value;
 
     public async Task SendRegistrationOtpAsync(string recipientEmail, string otp, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(_options.Username) || string.IsNullOrWhiteSpace(_options.AppPassword))
+        var usernameConfigured = !string.IsNullOrWhiteSpace(_options.Username);
+        var appPasswordConfigured = !string.IsNullOrWhiteSpace(_options.AppPassword);
+        if (!usernameConfigured || !appPasswordConfigured)
+        {
+            logger.LogError(
+                "Gmail SMTP credentials are incomplete. UsernameConfigured={UsernameConfigured}, AppPasswordConfigured={AppPasswordConfigured}.",
+                usernameConfigured,
+                appPasswordConfigured);
             throw new InvalidOperationException("Gmail SMTP credentials are not configured.");
+        }
 
         using var message = new MailMessage
         {
@@ -34,9 +46,51 @@ public sealed class GmailEmailSender(IOptions<EmailOptions> options) : IEmailSen
         using var client = new SmtpClient(_options.Host, _options.Port)
         {
             EnableSsl = _options.EnableSsl,
-            Credentials = new NetworkCredential(_options.Username, _options.AppPassword)
+            UseDefaultCredentials = false,
+            DeliveryMethod = SmtpDeliveryMethod.Network,
+            Timeout = 15_000,
+            Credentials = new NetworkCredential(_options.Username, _options.AppPassword.Replace(" ", string.Empty, StringComparison.Ordinal))
         };
-        cancellationToken.ThrowIfCancellationRequested();
-        await client.SendMailAsync(message, cancellationToken);
+
+        logger.LogInformation(
+            "Sending registration verification email through SMTP {Host}:{Port}; STARTTLS={StartTls}.",
+            _options.Host,
+            _options.Port,
+            _options.EnableSsl);
+
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await client.SendMailAsync(message, cancellationToken);
+            logger.LogInformation("Registration verification email was accepted by the SMTP server.");
+        }
+        catch (SmtpException exception)
+        {
+            logger.LogError(
+                "SMTP delivery failed. StatusCode={StatusCode}, ErrorType={ErrorType}, Message={Message}, InnerErrorType={InnerErrorType}, InnerMessage={InnerMessage}.",
+                exception.StatusCode,
+                exception.GetType().Name,
+                Sanitize(exception.Message),
+                exception.InnerException?.GetType().Name ?? "None",
+                Sanitize(exception.InnerException?.Message));
+            throw;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogError(
+                "Email delivery failed before an SMTP response was received. ErrorType={ErrorType}, Message={Message}, InnerErrorType={InnerErrorType}, InnerMessage={InnerMessage}.",
+                exception.GetType().Name,
+                Sanitize(exception.Message),
+                exception.InnerException?.GetType().Name ?? "None",
+                Sanitize(exception.InnerException?.Message));
+            throw;
+        }
+    }
+
+    private static string Sanitize(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "None";
+        var withoutEmails = Regex.Replace(value, @"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", "[email]", RegexOptions.IgnoreCase);
+        return Regex.Replace(withoutEmails, @"(?<!\d)\d{6}(?!\d)", "[six-digit-value]");
     }
 }

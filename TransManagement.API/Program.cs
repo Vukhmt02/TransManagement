@@ -35,8 +35,11 @@ if (jwtOptions.SecretKey.Length < 32 || jwtOptions.SecretKey.Contains("CHANGE_ME
 
 builder.Services.Configure<JwtOptions>(
     builder.Configuration.GetRequiredSection(JwtOptions.SectionName));
-builder.Services.Configure<EmailOptions>(
-    builder.Configuration.GetSection(EmailOptions.SectionName));
+builder.Services.AddOptions<EmailOptions>()
+    .Bind(builder.Configuration.GetSection(EmailOptions.SectionName))
+    .Validate(options => !string.IsNullOrWhiteSpace(options.Host), "Email:Host is required.")
+    .Validate(options => options.Port is > 0 and <= 65535, "Email:Port is invalid.")
+    .ValidateOnStart();
 
 builder.Services
     .AddDataProtection()
@@ -146,6 +149,16 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+
+var loadedEmailOptions = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<EmailOptions>>().Value;
+app.Logger.LogInformation(
+    "Email configuration loaded. Host={Host}, Port={Port}, STARTTLS={StartTls}, UsernameConfigured={UsernameConfigured}, SenderConfigured={SenderConfigured}, AppPasswordConfigured={AppPasswordConfigured}.",
+    loadedEmailOptions.Host,
+    loadedEmailOptions.Port,
+    loadedEmailOptions.EnableSsl,
+    !string.IsNullOrWhiteSpace(loadedEmailOptions.Username),
+    !string.IsNullOrWhiteSpace(loadedEmailOptions.SenderEmail) || !string.IsNullOrWhiteSpace(loadedEmailOptions.Username),
+    !string.IsNullOrWhiteSpace(loadedEmailOptions.AppPassword));
 
 if (app.Environment.IsDevelopment() &&
     app.Configuration.GetValue<bool>("Database:SeedDevelopmentData"))

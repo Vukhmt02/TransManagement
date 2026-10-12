@@ -5,6 +5,7 @@ using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using TransManagement.Application.Common.Identity;
 using TransManagement.Application.Common.Interfaces;
@@ -19,6 +20,7 @@ public sealed class IdentityService(
     UserManager<ApplicationUser> userManager,
     ApplicationDbContext dbContext,
     IEmailSender emailSender,
+    ILogger<IdentityService> logger,
     IOptions<JwtOptions> jwtOptions) : IIdentityService
 {
     private readonly JwtOptions _jwtOptions = jwtOptions.Value;
@@ -50,8 +52,11 @@ public sealed class IdentityService(
             await emailSender.SendRegistrationOtpAsync(email.Trim(), otp, cancellationToken);
             return Result.Success();
         }
-        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
+            logger.LogWarning(
+                "Registration OTP delivery failed. ErrorType={ErrorType}. See the email sender log immediately above for the safe SMTP diagnostic.",
+                exception.GetType().Name);
             entity.AllowImmediateRetry();
             await dbContext.SaveChangesAsync(cancellationToken);
             return Result.Failure(IdentityErrors.EmailDeliveryFailed);
