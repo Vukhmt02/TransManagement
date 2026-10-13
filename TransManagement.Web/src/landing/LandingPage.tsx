@@ -3,19 +3,43 @@ import './landing.css'
 
 interface Props { onLogin: () => void; onRegister: () => void }
 
-const services = [
-  ['↗', 'Vận chuyển liên tỉnh', 'Kết nối hàng hóa giữa các tỉnh thành với lịch trình minh bạch và ổn định.'],
-  ['▣', 'Hàng nguyên chuyến', 'Phương tiện riêng cho từng lô hàng, linh hoạt thời gian và điểm giao nhận.'],
-  ['⌖', 'Theo dõi hành trình', 'Cập nhật trạng thái và vị trí chuyến xe trong suốt quá trình vận chuyển.'],
-  ['✓', 'Giao nhận xác thực', 'Lưu bằng chứng giao hàng, người nhận và thời gian hoàn tất chính xác.'],
+type IconName = 'arrow' | 'box' | 'check' | 'clock' | 'location' | 'phone' | 'route' | 'search' | 'shield' | 'truck'
+
+const services: { icon: IconName; title: string; copy: string }[] = [
+  { icon: 'route', title: 'Vận chuyển liên tỉnh', copy: 'Tổ chức hành trình rõ ràng từ điểm nhận đến điểm giao, phù hợp nhiều nhu cầu hàng hóa.' },
+  { icon: 'truck', title: 'Hàng nguyên chuyến', copy: 'Chủ động phương tiện, thời gian khởi hành và kế hoạch giao nhận cho từng lô hàng.' },
+  { icon: 'location', title: 'Theo dõi GPS', copy: 'Tài xế cập nhật vị trí trong hành trình để bộ phận vận hành theo dõi tập trung.' },
+  { icon: 'check', title: 'Xác nhận giao hàng', copy: 'Ghi nhận người nhận, thời gian hoàn tất và bằng chứng giao hàng trên cùng hệ thống.' },
+]
+
+const routes = [
+  { from: 'TP. Hồ Chí Minh', to: 'Đà Nẵng', type: 'Tuyến minh họa', time: 'Theo kế hoạch chuyến' },
+  { from: 'Hà Nội', to: 'Hải Phòng', type: 'Tuyến minh họa', time: 'Theo kế hoạch chuyến' },
+  { from: 'Bình Dương', to: 'Đồng Nai', type: 'Tuyến minh họa', time: 'Theo kế hoạch chuyến' },
 ]
 
 const faqs = [
-  ['Tôi theo dõi đơn hàng bằng cách nào?', 'Đăng nhập cổng khách hàng để xem trạng thái, tiến trình và thông tin của tất cả đơn vận chuyển.'],
-  ['Giá vận chuyển được tính như thế nào?', 'Cước phí phụ thuộc tuyến đường, khối lượng, thể tích, loại xe và thời gian giao nhận. Chúng tôi sẽ xác nhận trước khi vận chuyển.'],
-  ['Tôi có thể hủy đơn không?', 'Bạn có thể hủy khi đơn đang ở trạng thái nháp hoặc chờ phân công.'],
-  ['TransFlow có hỗ trợ giao hàng liên tỉnh?', 'Có. Hệ thống được thiết kế cho cả vận chuyển nội thành, liên tỉnh và hàng nguyên chuyến.'],
+  ['Tôi theo dõi đơn hàng bằng cách nào?', 'Đăng nhập cổng khách hàng để xem trạng thái và thông tin của các đơn vận chuyển thuộc tài khoản của bạn.'],
+  ['Chi phí vận chuyển được xác định ra sao?', 'Chi phí phụ thuộc tuyến đường, khối lượng, thể tích, phương tiện và lịch giao nhận. Bộ phận điều phối sẽ xác nhận trước khi vận chuyển.'],
+  ['Khi nào tôi có thể hủy đơn?', 'Bạn có thể hủy khi đơn vẫn ở trạng thái nháp hoặc đang chờ phân công.'],
+  ['Tài xế cập nhật hành trình như thế nào?', 'Sau khi bắt đầu chuyến, tài xế có thể chia sẻ GPS và xác nhận từng điểm lấy hoặc giao hàng.'],
 ]
+
+function Icon({ name }: { name: IconName }) {
+  const paths: Record<IconName, React.ReactNode> = {
+    arrow: <path d="M5 12h14m-5-5 5 5-5 5"/>,
+    box: <><path d="m4 7 8-4 8 4-8 4-8-4Z"/><path d="M4 7v10l8 4 8-4V7M12 11v10"/></>,
+    check: <><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16 9"/></>,
+    clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
+    location: <><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></>,
+    phone: <path d="M7 3H4.5A1.5 1.5 0 0 0 3 4.5C3 13.6 10.4 21 19.5 21a1.5 1.5 0 0 0 1.5-1.5V17l-4-1-1.2 2a14 14 0 0 1-9.8-9.8L8 7 7 3Z"/>,
+    route: <><circle cx="6" cy="18" r="3"/><circle cx="18" cy="6" r="3"/><path d="M8.5 16.5c5-2 2-6 7-8"/></>,
+    search: <><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></>,
+    shield: <><path d="M12 3 5 6v5c0 5 3 8 7 10 4-2 7-5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></>,
+    truck: <><path d="M3 6h11v11H3zM14 10h4l3 4v3h-7z"/><circle cx="7" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></>,
+  }
+  return <svg viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>
+}
 
 export default function LandingPage({ onLogin, onRegister }: Props) {
   const [menu, setMenu] = useState(false)
@@ -25,7 +49,7 @@ export default function LandingPage({ onLogin, onRegister }: Props) {
 
   function track(event: FormEvent) {
     event.preventDefault()
-    setNotice(tracking.trim() ? 'Vui lòng đăng nhập để tra cứu vận đơn an toàn.' : 'Hãy nhập mã vận đơn cần tra cứu.')
+    setNotice(tracking.trim() ? 'Đăng nhập để xem thông tin vận đơn được bảo vệ.' : 'Hãy nhập mã vận đơn cần tra cứu.')
   }
 
   function quote(event: FormEvent<HTMLFormElement>) {
@@ -35,35 +59,60 @@ export default function LandingPage({ onLogin, onRegister }: Props) {
   }
 
   return <div className="landing">
+    <div className="landing-topbar"><div><span><Icon name="phone"/>1900 1234</span><span>support@transflow.vn</span></div><p>Hỗ trợ vận hành · Theo dõi hành trình tập trung</p></div>
     <header className="landing-header">
-      <a className="landing-logo" href="#top"><span>TF</span><b>TRANS<em>FLOW</em></b></a>
-      <button className="landing-menu" onClick={() => setMenu(!menu)} aria-label="Mở menu">☰</button>
+      <a className="landing-logo" href="#top"><span><Icon name="truck"/></span><b>TRANS<em>FLOW</em></b></a>
+      <button className="landing-menu" onClick={() => setMenu(!menu)} aria-label="Mở menu" aria-expanded={menu}>☰</button>
       <nav className={menu ? 'open' : ''}>
-        <a href="#services" onClick={() => setMenu(false)}>Dịch vụ</a><a href="#process" onClick={() => setMenu(false)}>Quy trình</a><a href="#tracking" onClick={() => setMenu(false)}>Tra cứu</a><a href="#contact" onClick={() => setMenu(false)}>Liên hệ</a>
+        <a href="#top" onClick={() => setMenu(false)}>Trang chủ</a><a href="#routes" onClick={() => setMenu(false)}>Tuyến vận chuyển</a><a href="#services" onClick={() => setMenu(false)}>Dịch vụ</a><a href="#process" onClick={() => setMenu(false)}>Quy trình</a><a href="#contact" onClick={() => setMenu(false)}>Liên hệ</a>
       </nav>
-      <div className="landing-auth"><button onClick={onLogin}>Đăng nhập</button><button onClick={onRegister}>Nhận báo giá</button></div>
+      <div className="landing-auth"><button onClick={onLogin}>Đăng nhập</button><button onClick={onRegister}>Đăng ký</button></div>
     </header>
 
     <main id="top">
       <section className="landing-hero">
-        <div className="hero-copy"><p className="landing-eyebrow"><i/> VẬN HÀNH THÔNG MINH · GIAO HÀNG ĐÚNG HẸN</p><h1>Vận chuyển hàng hóa<br/><em>minh bạch trên mọi hành trình.</em></h1><p className="hero-lead">Quản lý đơn hàng, theo dõi chuyến xe và xác nhận giao nhận trên một nền tảng thống nhất dành cho doanh nghiệp hiện đại.</p><div className="hero-actions"><button onClick={onRegister}>Gửi yêu cầu vận chuyển <span>→</span></button><a href="#tracking">Tra cứu đơn hàng</a></div><div className="hero-proof"><span><b>98.7%</b> giao đúng hạn</span><span><b>24/7</b> theo dõi hành trình</span><span><b>63</b> tỉnh thành</span></div></div>
-        <div className="hero-visual" aria-hidden="true"><div className="map-lines"/><div className="visual-card route-a"><small>CHUYẾN ĐANG CHẠY</small><b>SHP-2026-018</b><span>TP. Hồ Chí Minh → Đà Nẵng</span><div><i/><i/><i/></div></div><div className="visual-truck">▰<span>● ●</span></div><div className="visual-card delivery"><span>✓</span><div><small>GIAO HÀNG</small><b>Đã xác nhận</b></div></div><div className="location-pin">⌖</div></div>
+        <div className="hero-route-lines" aria-hidden="true"/>
+        <div className="hero-copy">
+          <p className="landing-eyebrow"><i/> GIẢI PHÁP QUẢN LÝ VẬN TẢI</p>
+          <h1>Vận chuyển đúng hẹn.<br/><em>An tâm mọi hành trình.</em></h1>
+          <p className="hero-lead">Từ tiếp nhận yêu cầu đến giao hàng, TransFlow kết nối khách hàng, điều phối và tài xế trên một quy trình rõ ràng.</p>
+          <div className="hero-actions"><button onClick={onRegister}>Tạo yêu cầu vận chuyển <Icon name="arrow"/></button><a href="#services">Khám phá dịch vụ</a></div>
+          <div className="hero-benefits"><span><Icon name="shield"/>Dữ liệu được bảo vệ</span><span><Icon name="location"/>Theo dõi GPS</span><span><Icon name="check"/>Xác nhận giao nhận</span></div>
+        </div>
+
+        <div className="hero-lookup" id="tracking">
+          <div className="lookup-title"><span><Icon name="search"/></span><div><small>TRA CỨU NHANH</small><h2>Kiểm tra vận đơn</h2></div></div>
+          <p>Nhập mã đơn để bắt đầu. Thông tin chi tiết chỉ hiển thị sau khi đăng nhập.</p>
+          <form onSubmit={track}><label htmlFor="landing-tracking">Mã vận đơn</label><div><Icon name="box"/><input id="landing-tracking" value={tracking} onChange={event => setTracking(event.target.value)} placeholder="VD: WEB-20261009-AB12"/><button>Tra cứu <Icon name="arrow"/></button></div></form>
+          {notice && <div className="lookup-notice">{notice}{tracking.trim() && <button onClick={onLogin}>Đăng nhập ngay</button>}</div>}
+          <div className="lookup-route"><span><i/>Điểm nhận</span><b/><span><i/>Điểm giao</span></div>
+          <div className="lookup-help"><Icon name="phone"/><span>Cần hỗ trợ?<b>1900 1234</b></span></div>
+        </div>
       </section>
 
-      <section className="trust-strip"><span>ĐƯỢC TIN DÙNG TRONG VẬN HÀNH</span><b>LOGISTICS</b><b>RETAIL</b><b>MANUFACTURING</b><b>E-COMMERCE</b></section>
+      <section className="capability-strip"><div><Icon name="clock"/><span><b>Điều phối tập trung</b><small>Theo dõi kế hoạch chuyến</small></span></div><div><Icon name="truck"/><span><b>Quản lý đội xe</b><small>Phương tiện và tài xế</small></span></div><div><Icon name="location"/><span><b>Cập nhật vị trí</b><small>Trong quá trình vận chuyển</small></span></div><div><Icon name="check"/><span><b>Giao nhận rõ ràng</b><small>Trạng thái và bằng chứng</small></span></div></section>
 
-      <section className="landing-section services" id="services"><div className="section-heading"><p>DỊCH VỤ CỦA CHÚNG TÔI</p><h2>Một nền tảng cho mọi nhu cầu vận chuyển</h2><span>Từ đơn hàng nhỏ đến chuyến xe đường dài, TransFlow giúp bạn kiểm soát toàn bộ quá trình.</span></div><div className="service-grid">{services.map(([icon,title,copy]) => <article key={title}><i>{icon}</i><h3>{title}</h3><p>{copy}</p><a href="#quote">Tìm hiểu thêm →</a></article>)}</div></section>
+      <section className="landing-section route-showcase" id="routes">
+        <div className="section-heading split-heading"><div><p>TUYẾN VẬN CHUYỂN</p><h2>Hành trình được tổ chức rõ ràng từ đầu đến cuối</h2></div><span>Các thẻ dưới đây minh họa cách tuyến đường được trình bày trong hệ thống, không phải lịch chạy cố định.</span></div>
+        <div className="route-grid">{routes.map((route, index) => <article key={route.from}><header><span>0{index + 1}</span><small>{route.type}</small></header><div className="route-points"><div><i/><span><small>Điểm đi</small><b>{route.from}</b></span></div><em/><div><i/><span><small>Điểm đến</small><b>{route.to}</b></span></div></div><footer><span><Icon name="clock"/>{route.time}</span><button onClick={onRegister}>Gửi yêu cầu <Icon name="arrow"/></button></footer></article>)}</div>
+      </section>
 
-      <section className="tracking-section" id="tracking"><div><p>TRA CỨU NHANH</p><h2>Đơn hàng của bạn đang ở đâu?</h2><span>Nhập mã vận đơn. Thông tin chi tiết được bảo vệ trong tài khoản khách hàng.</span></div><form onSubmit={track}><div><span>⌕</span><input value={tracking} onChange={e => setTracking(e.target.value)} placeholder="Ví dụ: WEB-20261009-AB12"/><button>Tra cứu</button></div>{notice && <p>{notice} {tracking.trim() && <button type="button" onClick={onLogin}>Đăng nhập ngay →</button>}</p>}</form></section>
+      <section className="about-section">
+        <div className="about-visual" aria-hidden="true"><div className="about-map"/><span className="about-truck"><Icon name="truck"/></span><div className="about-status"><i/><span><small>HỆ THỐNG VẬN HÀNH</small><b>Đang kết nối hành trình</b></span></div></div>
+        <div className="about-copy"><p>VỀ TRANSFLOW</p><h2>Một trung tâm điều hành cho toàn bộ hoạt động vận tải</h2><span>TransFlow giúp doanh nghiệp quản lý khách hàng, đơn hàng, chuyến xe, tài xế và phương tiện mà không phải tách rời dữ liệu ở nhiều nơi.</span><ul><li><Icon name="check"/>Tạo và quản lý yêu cầu vận chuyển</li><li><Icon name="check"/>Phân công phương tiện và tài xế</li><li><Icon name="check"/>Theo dõi tiến độ từng chuyến</li></ul><a href="#process">Xem quy trình vận hành <Icon name="arrow"/></a></div>
+      </section>
 
-      <section className="landing-section process" id="process"><div className="section-heading"><p>QUY TRÌNH ĐƠN GIẢN</p><h2>Từ yêu cầu đến giao hàng trong 5 bước</h2></div><div className="process-line">{[['01','Gửi yêu cầu'],['02','Xác nhận báo giá'],['03','Phân công xe'],['04','Theo dõi hành trình'],['05','Giao và xác nhận']].map(([n,t],i) => <article key={n}><i>{n}</i><b>{t}</b><span>{i < 4 ? '→' : '✓'}</span></article>)}</div></section>
+      <section className="landing-section services" id="services"><div className="section-heading centered"><p>DỊCH VỤ &amp; NĂNG LỰC</p><h2>Đáp ứng từng nhu cầu vận chuyển</h2><span>Mỗi dịch vụ được kết nối trực tiếp với quy trình quản lý và theo dõi trên TransFlow.</span></div><div className="service-grid">{services.map((service, index) => <article key={service.title}><i><Icon name={service.icon}/></i><span>0{index + 1}</span><h3>{service.title}</h3><p>{service.copy}</p><a href="#quote">Yêu cầu tư vấn <Icon name="arrow"/></a></article>)}</div></section>
 
-      <section className="quote-section" id="quote"><div className="quote-copy"><p>NHẬN BÁO GIÁ</p><h2>Bắt đầu hành trình tiếp theo cùng TransFlow</h2><span>Gửi thông tin cơ bản, đội ngũ điều phối sẽ liên hệ để tư vấn phương án phù hợp.</span><ul><li>Phản hồi nhanh chóng</li><li>Chi phí minh bạch</li><li>Không có phí ẩn</li></ul></div><form onSubmit={quote}><div className="quote-grid"><label>Họ và tên<input required placeholder="Nguyễn Văn An"/></label><label>Số điện thoại<input required type="tel" placeholder="0901 234 567"/></label><label>Điểm lấy hàng<input required placeholder="TP. Hồ Chí Minh"/></label><label>Điểm giao hàng<input required placeholder="Đà Nẵng"/></label><label>Loại hàng<input required placeholder="Hàng tiêu dùng"/></label><label>Khối lượng dự kiến<input required placeholder="500 kg"/></label></div><button>Gửi yêu cầu báo giá →</button>{quoteSent && <p className="quote-success">✓ Yêu cầu đã được ghi nhận trên giao diện. Đăng ký tài khoản để gửi đơn chính thức.</p>}</form></section>
+      <section className="landing-section process" id="process"><div className="section-heading"><p>QUY TRÌNH VẬN CHUYỂN</p><h2>5 bước xuyên suốt một hành trình</h2><span>Trạng thái được cập nhật theo từng giai đoạn để khách hàng và điều phối cùng theo dõi.</span></div><div className="process-line">{[['01','Gửi yêu cầu','Khách hàng nhập thông tin hàng hóa.'],['02','Xác nhận','Điều phối kiểm tra và lên phương án.'],['03','Phân công','Gắn đơn hàng với xe và tài xế.'],['04','Vận chuyển','Tài xế cập nhật hành trình, GPS.'],['05','Hoàn tất','Ghi nhận giao hàng và người nhận.']].map(([number,title,copy]) => <article key={number}><i>{number}</i><div><b>{title}</b><p>{copy}</p></div></article>)}</div></section>
 
-      <section className="landing-section faq"><div className="section-heading"><p>CÂU HỎI THƯỜNG GẶP</p><h2>Thông tin bạn có thể cần</h2></div><div className="faq-list">{faqs.map(([q,a],i) => <details key={q} open={i===0}><summary>{q}<span>+</span></summary><p>{a}</p></details>)}</div></section>
+      <section className="quote-section" id="quote"><div className="quote-copy"><p>YÊU CẦU TƯ VẤN</p><h2>Chuẩn bị cho chuyến hàng tiếp theo?</h2><span>Gửi thông tin cơ bản để bắt đầu. Đơn vận chuyển chính thức được tạo trong cổng khách hàng.</span><div><i><Icon name="phone"/></i><span><small>Đường dây hỗ trợ</small><b>1900 1234</b></span></div></div><form onSubmit={quote}><div className="quote-grid"><label>Họ và tên<input required placeholder="Nguyễn Văn An"/></label><label>Số điện thoại<input required type="tel" placeholder="0901 234 567"/></label><label>Điểm lấy hàng<input required placeholder="TP. Hồ Chí Minh"/></label><label>Điểm giao hàng<input required placeholder="Đà Nẵng"/></label><label>Loại hàng<input required placeholder="Hàng tiêu dùng"/></label><label>Khối lượng dự kiến<input required placeholder="500 kg"/></label></div><button>Gửi yêu cầu tư vấn <Icon name="arrow"/></button>{quoteSent && <p className="quote-success"><Icon name="check"/> Yêu cầu đã được ghi nhận trên giao diện. Đăng ký tài khoản để tạo đơn chính thức.</p>}</form></section>
 
-      <section className="final-cta"><p>SẴN SÀNG BẮT ĐẦU?</p><h2>Để mỗi chuyến hàng trở nên đơn giản hơn.</h2><div><button onClick={onRegister}>Tạo tài khoản miễn phí</button><button onClick={onLogin}>Đăng nhập cổng khách hàng</button></div></section>
+      <section className="landing-section faq"><div className="section-heading"><p>HỖ TRỢ KHÁCH HÀNG</p><h2>Câu hỏi thường gặp</h2></div><div className="faq-list">{faqs.map(([question,answer],index) => <details key={question} open={index === 0}><summary>{question}<span>+</span></summary><p>{answer}</p></details>)}</div></section>
+
+      <section className="final-cta"><div><p>BẮT ĐẦU CÙNG TRANSFLOW</p><h2>Quản lý hành trình rõ ràng hơn ngay hôm nay.</h2></div><div><button onClick={onRegister}>Tạo tài khoản khách hàng <Icon name="arrow"/></button><button onClick={onLogin}>Đăng nhập hệ thống</button></div></section>
     </main>
-    <footer id="contact"><a className="landing-logo" href="#top"><span>TF</span><b>TRANS<em>FLOW</em></b></a><p>Nền tảng quản lý vận tải minh bạch, hiệu quả và đáng tin cậy.</p><div><b>Liên hệ</b><a href="tel:19001234">1900 1234</a><a href="mailto:support@transflow.vn">support@transflow.vn</a></div><div><b>Thông tin</b><a href="#services">Dịch vụ</a><a href="#process">Quy trình</a></div><small>© 2026 TransFlow. All rights reserved.</small></footer>
+
+    <footer id="contact"><div className="footer-brand"><a className="landing-logo" href="#top"><span><Icon name="truck"/></span><b>TRANS<em>FLOW</em></b></a><p>Nền tảng quản lý vận tải kết nối khách hàng, điều phối và tài xế trên cùng một hành trình.</p></div><div><b>Khám phá</b><a href="#routes">Tuyến vận chuyển</a><a href="#services">Dịch vụ</a><a href="#process">Quy trình</a></div><div><b>Liên hệ</b><a href="tel:19001234">1900 1234</a><a href="mailto:support@transflow.vn">support@transflow.vn</a></div><div><b>Tài khoản</b><button onClick={onLogin}>Đăng nhập</button><button onClick={onRegister}>Đăng ký khách hàng</button></div><small>© 2026 TransFlow · Transportation Management System</small></footer>
   </div>
 }
