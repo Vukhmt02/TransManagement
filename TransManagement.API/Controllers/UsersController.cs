@@ -16,6 +16,23 @@ public sealed class UsersController(IIdentityService identityService) : ApiContr
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken) =>
         Ok(ApiResponse<IReadOnlyList<UserSummary>>.Ok(await identityService.GetUsersAsync(cancellationToken)));
 
+    [HttpPost("driver-accounts")]
+    [ProducesResponseType(typeof(ApiResponse<UserSummary>), StatusCodes.Status201Created)]
+    public async Task<IActionResult> CreateDriverAccount(
+        CreateDriverAccountRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await identityService.CreateDriverAccountAsync(
+            request.DriverId,
+            request.Email,
+            request.TemporaryPassword,
+            cancellationToken);
+
+        return result.IsSuccess
+            ? StatusCode(StatusCodes.Status201Created, ApiResponse<UserSummary>.Ok(result.Value))
+            : ErrorResponse(result.Error);
+    }
+
     [HttpPut("{userId:guid}/status")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> SetStatus(

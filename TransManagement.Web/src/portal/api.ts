@@ -25,6 +25,7 @@ export const customerPortalApi = {
 }
 
 export const driverPortalApi = {
+  profile: (token: string) => request<Driver>(token, '/api/driver-portal/profile'),
   shipments: (token: string) => request<Shipment[]>(token, '/api/driver-portal/shipments'),
   shipmentAction: (token: string, id: string, action: 'start' | 'complete') => request<void>(token, `/api/driver-portal/shipments/${id}/${action}`, json('POST')),
   location: (token: string, id: string, body: unknown) => request(token, `/api/driver-portal/shipments/${id}/location`, json('POST', body)),

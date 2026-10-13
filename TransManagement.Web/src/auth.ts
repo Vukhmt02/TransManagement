@@ -56,6 +56,18 @@ export async function getProfile(accessToken: string): Promise<UserProfile> {
   return result.data
 }
 
+export async function changePassword(accessToken: string, currentPassword: string, newPassword: string): Promise<void> {
+  const response = await authFetch('/api/Auth/change-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  }, accessToken)
+  if (!response.ok) {
+    const problem = (await response.json().catch(() => ({}))) as ProblemDetails
+    throw new Error(problem.detail || 'Không thể đổi mật khẩu.')
+  }
+}
+
 export async function logout(tokens: AuthTokens | null): Promise<void> {
   const currentTokens = getStoredTokens() ?? tokens
   if (currentTokens?.refreshToken) {

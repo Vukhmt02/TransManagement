@@ -2,7 +2,7 @@ import { FormEvent, useState } from 'react'
 import { managementApi } from './api'
 import type { Customer, DashboardData, Driver, TransportOrder, Vehicle } from './types'
 
-export type ModalKind = 'customer' | 'driver' | 'vehicle' | 'order' | 'shipment'
+export type ModalKind = 'customer' | 'driver' | 'driverAccount' | 'vehicle' | 'order' | 'shipment'
 
 interface Props {
   kind: ModalKind
@@ -32,7 +32,7 @@ const inputDateTime = (value?: string) => {
 
 const labels: Record<ModalKind, string> = {
   customer: 'khách hàng', driver: 'tài xế', vehicle: 'phương tiện',
-  order: 'đơn vận chuyển', shipment: 'chuyến xe',
+  driverAccount: 'tài khoản tài xế', order: 'đơn vận chuyển', shipment: 'chuyến xe',
 }
 
 export default function ManagementModal({ kind, entity, data, accessToken, onClose, onDone }: Props) {
@@ -65,6 +65,17 @@ export default function ManagementModal({ kind, entity, data, accessToken, onClo
         await managementApi.saveDriver(accessToken, current?.id, payload)
         const newStatus = text(form, 'status')
         if (current && newStatus && newStatus !== current.status) await managementApi.setDriverStatus(accessToken, current.id, newStatus)
+      }
+      if (kind === 'driverAccount') {
+        const driver = entity as Driver
+        const temporaryPassword = text(form, 'temporaryPassword')
+        if (temporaryPassword !== text(form, 'confirmPassword'))
+          throw new Error('Mật khẩu xác nhận không khớp.')
+        await managementApi.createDriverAccount(accessToken, {
+          driverId: driver.id,
+          email: text(form, 'email'),
+          temporaryPassword,
+        })
       }
       if (kind === 'vehicle') {
         const current = entity as Vehicle | undefined
@@ -101,7 +112,7 @@ export default function ManagementModal({ kind, entity, data, accessToken, onClo
           plannedDepartureAtUtc: utc(form, 'plannedDepartureAtUtc'), orderIds,
         })
       }
-      onDone(`${entity ? 'Cập nhật' : 'Tạo'} ${labels[kind]} thành công.`)
+      onDone(`${kind === 'driverAccount' || !entity ? 'Tạo' : 'Cập nhật'} ${labels[kind]} thành công.`)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Không thể lưu dữ liệu.')
     } finally { setSaving(false) }
@@ -109,17 +120,18 @@ export default function ManagementModal({ kind, entity, data, accessToken, onClo
 
   return <div className="modal-backdrop" role="presentation" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
     <section className={`management-modal modal-${kind}`} role="dialog" aria-modal="true" aria-labelledby="modal-title">
-      <header><div><p>{entity ? 'CHỈNH SỬA THÔNG TIN' : 'TẠO MỚI'}</p><h2 id="modal-title">{entity ? 'Cập nhật' : 'Thêm'} {labels[kind]}</h2></div><button type="button" onClick={onClose} aria-label="Đóng">×</button></header>
+      <header><div><p>{kind === 'driverAccount' || !entity ? 'TẠO MỚI' : 'CHỈNH SỬA THÔNG TIN'}</p><h2 id="modal-title">{kind === 'driverAccount' || !entity ? 'Thêm' : 'Cập nhật'} {labels[kind]}</h2></div><button type="button" onClick={onClose} aria-label="Đóng">×</button></header>
       <form onSubmit={submit}>
         <div className="modal-body">
           {error && <div className="modal-error">{error}</div>}
           {kind === 'customer' && <CustomerFields value={entity as Customer | undefined}/>} 
           {kind === 'driver' && <DriverFields value={entity as Driver | undefined}/>} 
+          {kind === 'driverAccount' && <DriverAccountFields value={entity as Driver}/>}
           {kind === 'vehicle' && <VehicleFields value={entity as Vehicle | undefined}/>} 
           {kind === 'order' && <OrderFields value={entity as TransportOrder | undefined} data={data}/>} 
           {kind === 'shipment' && <ShipmentFields data={data}/>} 
         </div>
-        <footer><button type="button" className="cancel-button" onClick={onClose}>Hủy</button><button type="submit" className="save-button" disabled={saving}>{saving ? 'Đang lưu...' : entity ? 'Lưu thay đổi' : 'Tạo mới'}</button></footer>
+        <footer><button type="button" className="cancel-button" onClick={onClose}>Hủy</button><button type="submit" className="save-button" disabled={saving}>{saving ? 'Đang lưu...' : kind === 'driverAccount' ? 'Tạo tài khoản' : entity ? 'Lưu thay đổi' : 'Tạo mới'}</button></footer>
       </form>
     </section>
   </div>
@@ -149,6 +161,17 @@ function DriverFields({ value }: { value?: Driver }) {
     <Field label="Hạng bằng" name="licenseClass" defaultValue={value?.licenseClass} required/>
     <Field label="Ngày hết hạn" name="licenseExpiryDate" type="date" defaultValue={inputDate(value?.licenseExpiryDate)} required/>
     {value && <label className="modal-field"><span>Trạng thái</span><select name="status" defaultValue={value.status} disabled={value.status === 'Assigned'}>{value.status === 'Assigned' && <option value="Assigned">Đã phân công</option>}<option value="Available">Sẵn sàng</option><option value="OnLeave">Nghỉ phép</option><option value="Inactive">Ngừng hoạt động</option></select></label>}
+  </div>
+}
+
+function DriverAccountFields({ value }: { value: Driver }) {
+  return <div className="form-grid">
+    <div className="modal-field full driver-account-summary"><span>Hồ sơ tài xế</span><strong>{value.employeeCode} · {value.fullName}</strong><small>{value.phone}</small></div>
+    <Field label="Email đăng nhập" name="email" type="email" required placeholder="taixe@congty.vn"/>
+    <div/>
+    <Field label="Mật khẩu tạm thời" name="temporaryPassword" type="password" required placeholder="Tối thiểu 8 ký tự"/>
+    <Field label="Xác nhận mật khẩu" name="confirmPassword" type="password" required/>
+    <p className="driver-account-note full">Mật khẩu phải có chữ hoa, chữ thường, chữ số và ký tự đặc biệt. Hãy chuyển mật khẩu cho tài xế qua kênh an toàn và yêu cầu đổi sau lần đăng nhập đầu tiên.</p>
   </div>
 }
 

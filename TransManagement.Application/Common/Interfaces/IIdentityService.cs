@@ -54,6 +54,12 @@ public interface IIdentityService
 
     Task<IReadOnlyList<UserSummary>> GetUsersAsync(CancellationToken cancellationToken = default);
 
+    Task<Result<UserSummary>> CreateDriverAccountAsync(
+        Guid driverId,
+        string email,
+        string temporaryPassword,
+        CancellationToken cancellationToken = default);
+
     Task<Result<UserSummary>> SetUserRolesAsync(
         Guid userId,
         IReadOnlyCollection<string> roles,

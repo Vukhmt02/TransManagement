@@ -287,6 +287,48 @@ public sealed class IdentityService(
         return result;
     }
 
+    public async Task<Result<UserSummary>> CreateDriverAccountAsync(
+        Guid driverId,
+        string email,
+        string temporaryPassword,
+        CancellationToken cancellationToken = default)
+    {
+        var driver = await dbContext.Drivers.SingleOrDefaultAsync(x => x.Id == driverId, cancellationToken);
+        if (driver is null)
+            return Result<UserSummary>.Failure(new Error("auth.driver_not_found", "The driver was not found."));
+        if (driver.UserId.HasValue)
+            return Result<UserSummary>.Failure(new Error("auth.driver_already_linked", "This driver already has a user account."));
+
+        var normalizedEmail = email.Trim();
+        if (await userManager.FindByEmailAsync(normalizedEmail) is not null)
+            return Result<UserSummary>.Failure(IdentityErrors.RegistrationFailed("This email is already registered."));
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var user = new ApplicationUser
+        {
+            Email = normalizedEmail,
+            UserName = normalizedEmail,
+            FullName = driver.FullName,
+            PhoneNumber = driver.Phone,
+            EmailConfirmed = true
+        };
+
+        var createResult = await userManager.CreateAsync(user, temporaryPassword);
+        if (!createResult.Succeeded)
+            return Result<UserSummary>.Failure(IdentityErrors.RegistrationFailed(JoinErrors(createResult)));
+
+        var roleResult = await userManager.AddToRoleAsync(user, AppRoles.Driver);
+        if (!roleResult.Succeeded)
+            return Result<UserSummary>.Failure(new Error("auth.role_assignment_failed", JoinErrors(roleResult)));
+
+        driver.LinkToUser(user.Id);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return Result<UserSummary>.Success(
+            new UserSummary(user.Id, user.Email!, user.FullName, user.IsActive, [AppRoles.Driver]));
+    }
+
     public async Task<Result<UserSummary>> SetUserRolesAsync(Guid userId, IReadOnlyCollection<string> roles, CancellationToken cancellationToken = default)
     {
         var normalized = roles.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();

@@ -50,6 +50,8 @@ export const managementApi = {
     mutate(id ? `/api/Drivers/${id}` : '/api/Drivers', token, id ? 'PUT' : 'POST', body),
   setDriverStatus: (token: string, id: string, status: string) =>
     mutate(`/api/Drivers/${id}/status`, token, 'PUT', { status }),
+  createDriverAccount: (token: string, body: unknown) =>
+    mutate('/api/Users/driver-accounts', token, 'POST', body),
   saveVehicle: (token: string, id: string | undefined, body: unknown) =>
     mutate(id ? `/api/Vehicles/${id}` : '/api/Vehicles', token, id ? 'PUT' : 'POST', body),
   setVehicleStatus: (token: string, id: string, status: string) =>
