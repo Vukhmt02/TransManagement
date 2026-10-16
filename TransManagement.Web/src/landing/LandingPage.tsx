@@ -1,15 +1,16 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useRef, useState } from 'react'
 import './landing.css'
+import './services-offers.css'
 
 interface Props { onLogin: () => void; onRegister: () => void }
 
 type IconName = 'arrow' | 'box' | 'check' | 'clock' | 'location' | 'phone' | 'route' | 'search' | 'shield' | 'truck'
 
-const services: { icon: IconName; title: string; copy: string }[] = [
-  { icon: 'route', title: 'Vận chuyển liên tỉnh', copy: 'Tổ chức hành trình rõ ràng từ điểm nhận đến điểm giao, phù hợp nhiều nhu cầu hàng hóa.' },
-  { icon: 'truck', title: 'Hàng nguyên chuyến', copy: 'Chủ động phương tiện, thời gian khởi hành và kế hoạch giao nhận cho từng lô hàng.' },
-  { icon: 'location', title: 'Theo dõi GPS', copy: 'Tài xế cập nhật vị trí trong hành trình để bộ phận vận hành theo dõi tập trung.' },
-  { icon: 'check', title: 'Xác nhận giao hàng', copy: 'Ghi nhận người nhận, thời gian hoàn tất và bằng chứng giao hàng trên cùng hệ thống.' },
+const services = [
+  { eyebrow: 'VẬN CHUYỂN LIÊN TỈNH',  copy: 'Tổ chức hành trình rõ ràng từ điểm nhận đến điểm giao.', image: '/images/services/intercity-freight.png', alt: 'Xe tải vận chuyển hàng hóa liên tỉnh' },
+  { eyebrow: 'HÀNG NGUYÊN CHUYẾN',  copy: 'Linh hoạt phương tiện, thời gian khởi hành và kế hoạch giao nhận.', image: '/images/services/full-truckload.png', alt: 'Đội xe tải phục vụ hàng nguyên chuyến' },
+  { eyebrow: 'THEO DÕI HÀNH TRÌNH',  copy: 'Cập nhật GPS giúp điều phối theo dõi tiến độ tập trung.', image: '/images/services/gps-visibility.png', alt: 'Trung tâm theo dõi vị trí và hành trình xe tải' },
+  { eyebrow: 'GIAO NHẬN MINH BẠCH',  copy: 'Ghi nhận người nhận, thời gian và bằng chứng giao hàng.', image: '/images/services/delivery-confirmation.png', alt: 'Tài xế xác nhận giao hàng với khách hàng' },
 ]
 
 const routes = [
@@ -46,6 +47,28 @@ export default function LandingPage({ onLogin, onRegister }: Props) {
   const [tracking, setTracking] = useState('')
   const [notice, setNotice] = useState('')
   const [quoteSent, setQuoteSent] = useState(false)
+  const [servicePage, setServicePage] = useState(0)
+  const serviceCarousel = useRef<HTMLDivElement>(null)
+
+  function scrollServices(direction: -1 | 1) {
+    const viewport = serviceCarousel.current
+    if (!viewport) return
+    viewport.scrollBy({ left: direction * viewport.clientWidth * 0.88, behavior: 'smooth' })
+  }
+
+  function updateServicePage() {
+    const viewport = serviceCarousel.current
+    if (!viewport) return
+    const maxScroll = viewport.scrollWidth - viewport.clientWidth
+    setServicePage(maxScroll > 0 && viewport.scrollLeft > maxScroll / 2 ? 1 : 0)
+  }
+
+  function goToServicePage(page: number) {
+    const viewport = serviceCarousel.current
+    if (!viewport) return
+    viewport.scrollTo({ left: page === 0 ? 0 : viewport.scrollWidth, behavior: 'smooth' })
+    setServicePage(page)
+  }
 
   function track(event: FormEvent) {
     event.preventDefault()
@@ -70,47 +93,65 @@ export default function LandingPage({ onLogin, onRegister }: Props) {
     </header>
 
     <main id="top">
-      <section className="landing-hero">
-        <div className="hero-route-lines" aria-hidden="true"/>
-        <div className="hero-copy">
-          <p className="landing-eyebrow"><i/> GIẢI PHÁP QUẢN LÝ VẬN TẢI</p>
-          <h1>Vận chuyển đúng hẹn.<br/><em>An tâm mọi hành trình.</em></h1>
-          <p className="hero-lead">Từ tiếp nhận yêu cầu đến giao hàng, TransFlow kết nối khách hàng, điều phối và tài xế trên một quy trình rõ ràng.</p>
-          <div className="hero-actions"><button onClick={onRegister}>Tạo yêu cầu vận chuyển <Icon name="arrow"/></button><a href="#services">Khám phá dịch vụ</a></div>
-          <div className="hero-benefits"><span><Icon name="shield"/>Dữ liệu được bảo vệ</span><span><Icon name="location"/>Theo dõi GPS</span><span><Icon name="check"/>Xác nhận giao nhận</span></div>
+      <section className="transport-banner" aria-label="Vận chuyển hàng hóa toàn quốc">
+        <div className="transport-banner__content">
+          <p><span/> VẬN CHUYỂN HÀNG HÓA TOÀN QUỐC</p>
+          <h2>Hà Nội <i>⇄</i> Đà Nẵng <i>⇄</i> TP. Hồ Chí Minh</h2>
+          <span>Kết nối hành trình, theo dõi tập trung và giao nhận rõ ràng trên một nền tảng.</span>
+          <div>
+            <button onClick={onRegister}>Gửi yêu cầu vận chuyển </button>
+            <button type="button" onClick={() => document.getElementById('tracking')?.scrollIntoView({ behavior: 'smooth' })}>Tra cứu vận đơn <Icon name="search"/></button>
+          </div>
         </div>
-
-        <div className="hero-lookup" id="tracking">
+      </section>
+      <section className="landing-hero">
+        <h1>Giải pháp quản lí vận tải</h1>
+        <div className="hero-route-lines" aria-hidden="true"/>
+        {/* <div className="hero-lookup" id="tracking">
           <div className="lookup-title"><span><Icon name="search"/></span><div><small>TRA CỨU NHANH</small><h2>Kiểm tra vận đơn</h2></div></div>
           <p>Nhập mã đơn để bắt đầu. Thông tin chi tiết chỉ hiển thị sau khi đăng nhập.</p>
           <form onSubmit={track}><label htmlFor="landing-tracking">Mã vận đơn</label><div><Icon name="box"/><input id="landing-tracking" value={tracking} onChange={event => setTracking(event.target.value)} placeholder="VD: WEB-20261009-AB12"/><button>Tra cứu <Icon name="arrow"/></button></div></form>
           {notice && <div className="lookup-notice">{notice}{tracking.trim() && <button onClick={onLogin}>Đăng nhập ngay</button>}</div>}
           <div className="lookup-route"><span><i/>Điểm nhận</span><b/><span><i/>Điểm giao</span></div>
           <div className="lookup-help"><Icon name="phone"/><span>Cần hỗ trợ?<b>1900 1234</b></span></div>
-        </div>
+        </div> */}
       </section>
 
       <section className="capability-strip"><div><Icon name="clock"/><span><b>Điều phối tập trung</b><small>Theo dõi kế hoạch chuyến</small></span></div><div><Icon name="truck"/><span><b>Quản lý đội xe</b><small>Phương tiện và tài xế</small></span></div><div><Icon name="location"/><span><b>Cập nhật vị trí</b><small>Trong quá trình vận chuyển</small></span></div><div><Icon name="check"/><span><b>Giao nhận rõ ràng</b><small>Trạng thái và bằng chứng</small></span></div></section>
-
       <section className="landing-section route-showcase" id="routes">
         <div className="section-heading split-heading"><div><p>TUYẾN VẬN CHUYỂN</p><h2>Hành trình được tổ chức rõ ràng từ đầu đến cuối</h2></div><span>Các thẻ dưới đây minh họa cách tuyến đường được trình bày trong hệ thống, không phải lịch chạy cố định.</span></div>
         <div className="route-grid">{routes.map((route, index) => <article key={route.from}><header><span>0{index + 1}</span><small>{route.type}</small></header><div className="route-points"><div><i/><span><small>Điểm đi</small><b>{route.from}</b></span></div><em/><div><i/><span><small>Điểm đến</small><b>{route.to}</b></span></div></div><footer><span><Icon name="clock"/>{route.time}</span><button onClick={onRegister}>Gửi yêu cầu <Icon name="arrow"/></button></footer></article>)}</div>
       </section>
 
-      <section className="about-section">
+      {/* <section className="about-section">
         <div className="about-visual" aria-hidden="true"><div className="about-map"/><span className="about-truck"><Icon name="truck"/></span><div className="about-status"><i/><span><small>HỆ THỐNG VẬN HÀNH</small><b>Đang kết nối hành trình</b></span></div></div>
         <div className="about-copy"><p>VỀ TRANSFLOW</p><h2>Một trung tâm điều hành cho toàn bộ hoạt động vận tải</h2><span>TransFlow giúp doanh nghiệp quản lý khách hàng, đơn hàng, chuyến xe, tài xế và phương tiện mà không phải tách rời dữ liệu ở nhiều nơi.</span><ul><li><Icon name="check"/>Tạo và quản lý yêu cầu vận chuyển</li><li><Icon name="check"/>Phân công phương tiện và tài xế</li><li><Icon name="check"/>Theo dõi tiến độ từng chuyến</li></ul><a href="#process">Xem quy trình vận hành <Icon name="arrow"/></a></div>
+      </section> */}
+
+      <section className="landing-section services offers-showcase" id="services">
+        <div className="offers-heading"><h2>DỊCH VỤ &amp; ƯU ĐÃI</h2><i/><p>Giải pháp vận chuyển được tổ chức theo từng nhu cầu và theo dõi tập trung trên TransFlow.</p></div>
+        <div className="offers-slider">
+          <button className="offers-arrow offers-arrow--prev" type="button" onClick={() => scrollServices(-1)} aria-label="Xem dịch vụ trước"><Icon name="arrow"/></button>
+          <div className="offers-viewport" ref={serviceCarousel} onScroll={updateServicePage}>
+            {services.map((service, index) => <article className="service-promo-card" key={service.title}>
+              <img src={service.image} alt={service.alt} loading={index === 0 ? 'eager' : 'lazy'}/>
+              <div className="service-promo-card__shade"/>
+              <div className="service-promo-card__copy"><small>{service.eyebrow}</small><h3>{service.title}</h3><p>{service.copy}</p><a href="#quote">Yêu cầu tư vấn <Icon name="arrow"/></a></div>
+            </article>)}
+          </div>
+          <button className="offers-arrow offers-arrow--next" type="button" onClick={() => scrollServices(1)} aria-label="Xem dịch vụ tiếp theo"><Icon name="arrow"/></button>
+        </div>
+        <div className="offers-dots" aria-label="Chọn nhóm dịch vụ"><button className={servicePage === 0 ? 'active' : ''} onClick={() => goToServicePage(0)} aria-label="Nhóm dịch vụ đầu"/><button className={servicePage === 1 ? 'active' : ''} onClick={() => goToServicePage(1)} aria-label="Nhóm dịch vụ tiếp theo"/></div>
       </section>
 
-      <section className="landing-section services" id="services"><div className="section-heading centered"><p>DỊCH VỤ &amp; NĂNG LỰC</p><h2>Đáp ứng từng nhu cầu vận chuyển</h2><span>Mỗi dịch vụ được kết nối trực tiếp với quy trình quản lý và theo dõi trên TransFlow.</span></div><div className="service-grid">{services.map((service, index) => <article key={service.title}><i><Icon name={service.icon}/></i><span>0{index + 1}</span><h3>{service.title}</h3><p>{service.copy}</p><a href="#quote">Yêu cầu tư vấn <Icon name="arrow"/></a></article>)}</div></section>
-
-      <section className="landing-section process" id="process"><div className="section-heading"><p>QUY TRÌNH VẬN CHUYỂN</p><h2>5 bước xuyên suốt một hành trình</h2><span>Trạng thái được cập nhật theo từng giai đoạn để khách hàng và điều phối cùng theo dõi.</span></div><div className="process-line">{[['01','Gửi yêu cầu','Khách hàng nhập thông tin hàng hóa.'],['02','Xác nhận','Điều phối kiểm tra và lên phương án.'],['03','Phân công','Gắn đơn hàng với xe và tài xế.'],['04','Vận chuyển','Tài xế cập nhật hành trình, GPS.'],['05','Hoàn tất','Ghi nhận giao hàng và người nhận.']].map(([number,title,copy]) => <article key={number}><i>{number}</i><div><b>{title}</b><p>{copy}</p></div></article>)}</div></section>
+      <section className="landing-section process" id="process"><div className="section-heading"><p>QUY TRÌNH VẬN CHUYỂN</p><h2>5 bước xuyên suốt một hành trình</h2><span>Trạng thái được cập nhật theo từng giai đoạn để khách hàng và điều phối cùng theo dõi.</span></div><div className="process-line">{[['01','Gửi yêu cầu','Khách hàng nhập thông tin hàng hóa.'],['02','Xác nhận','Điều phối kiểm tra và lên phương án.'],['03','Phân công','Gắn đơn hàng với xe và tài xế.'],['04','Vận chuyển','Tài xế cập nhật hành trình, GPS.'],['05','Hoàn tất','Ghi nhận giao hàng và người nhận.']].map(([number,title,copy]) => <article key={number}><i>{number}</i><div><b>{title}</b><p>{copy}</p></div></article>)}
+      </div></section>
 
       <section className="quote-section" id="quote"><div className="quote-copy"><p>YÊU CẦU TƯ VẤN</p><h2>Chuẩn bị cho chuyến hàng tiếp theo?</h2><span>Gửi thông tin cơ bản để bắt đầu. Đơn vận chuyển chính thức được tạo trong cổng khách hàng.</span><div><i><Icon name="phone"/></i><span><small>Đường dây hỗ trợ</small><b>1900 1234</b></span></div></div><form onSubmit={quote}><div className="quote-grid"><label>Họ và tên<input required placeholder="Nguyễn Văn An"/></label><label>Số điện thoại<input required type="tel" placeholder="0901 234 567"/></label><label>Điểm lấy hàng<input required placeholder="TP. Hồ Chí Minh"/></label><label>Điểm giao hàng<input required placeholder="Đà Nẵng"/></label><label>Loại hàng<input required placeholder="Hàng tiêu dùng"/></label><label>Khối lượng dự kiến<input required placeholder="500 kg"/></label></div><button>Gửi yêu cầu tư vấn <Icon name="arrow"/></button>{quoteSent && <p className="quote-success"><Icon name="check"/> Yêu cầu đã được ghi nhận trên giao diện. Đăng ký tài khoản để tạo đơn chính thức.</p>}</form></section>
 
       <section className="landing-section faq"><div className="section-heading"><p>HỖ TRỢ KHÁCH HÀNG</p><h2>Câu hỏi thường gặp</h2></div><div className="faq-list">{faqs.map(([question,answer],index) => <details key={question} open={index === 0}><summary>{question}<span>+</span></summary><p>{answer}</p></details>)}</div></section>
 
-      <section className="final-cta"><div><p>BẮT ĐẦU CÙNG TRANSFLOW</p><h2>Quản lý hành trình rõ ràng hơn ngay hôm nay.</h2></div><div><button onClick={onRegister}>Tạo tài khoản khách hàng <Icon name="arrow"/></button><button onClick={onLogin}>Đăng nhập hệ thống</button></div></section>
+      {/* <section className="final-cta"><div><p>BẮT ĐẦU CÙNG TRANSFLOW</p><h2>Quản lý hành trình rõ ràng hơn ngay hôm nay.</h2></div><div><button onClick={onRegister}>Tạo tài khoản khách hàng <Icon name="arrow"/></button><button onClick={onLogin}>Đăng nhập hệ thống</button></div></section> */}
     </main>
 
     <footer id="contact"><div className="footer-brand"><a className="landing-logo" href="#top"><span><Icon name="truck"/></span><b>TRANS<em>FLOW</em></b></a><p>Nền tảng quản lý vận tải kết nối khách hàng, điều phối và tài xế trên cùng một hành trình.</p></div><div><b>Khám phá</b><a href="#routes">Tuyến vận chuyển</a><a href="#services">Dịch vụ</a><a href="#process">Quy trình</a></div><div><b>Liên hệ</b><a href="tel:19001234">1900 1234</a><a href="mailto:support@transflow.vn">support@transflow.vn</a></div><div><b>Tài khoản</b><button onClick={onLogin}>Đăng nhập</button><button onClick={onRegister}>Đăng ký khách hàng</button></div><small>© 2026 TransFlow · Transportation Management System</small></footer>
