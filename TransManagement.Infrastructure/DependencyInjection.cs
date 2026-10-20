@@ -6,6 +6,8 @@ using TransManagement.Infrastructure.Identity;
 using TransManagement.Infrastructure.Persistence;
 using TransManagement.Infrastructure.Transport;
 using TransManagement.Application.Transport;
+using TransManagement.Application.Chat;
+using TransManagement.Infrastructure.Chat;
 
 namespace TransManagement.Infrastructure;
 
@@ -39,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<IIdentityService, IdentityService>();
         services.AddScoped<IEmailSender, GmailEmailSender>();
         services.AddScoped<ITransportService, TransportService>();
+        services.AddScoped<IChatService, ChatService>();
 
         return services;
     }

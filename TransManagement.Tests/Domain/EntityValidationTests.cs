@@ -112,4 +112,43 @@ public sealed class EntityValidationTests
         Assert.Throws<ArgumentException>(() =>
             new DeliveryProof(Guid.NewGuid(), "Receiver", null, null, null, DateTime.UtcNow));
     }
+
+    [Fact]
+    public void Conversation_ShouldFollowAssignmentAndCloseLifecycle()
+    {
+        var adminUserId = Guid.NewGuid();
+        var conversation = new Conversation(Guid.NewGuid(), "  Support request  ");
+
+        conversation.AssignTo(adminUserId);
+        conversation.Close(DateTime.UtcNow);
+
+        Assert.Equal("Support request", conversation.Subject);
+        Assert.Equal(adminUserId, conversation.AssignedAdminUserId);
+        Assert.Equal(ConversationStatus.Closed, conversation.Status);
+        Assert.NotNull(conversation.ClosedAtUtc);
+    }
+
+    [Fact]
+    public void Conversation_ShouldRejectAssigningAClosedConversation()
+    {
+        var conversation = new Conversation(Guid.NewGuid(), "Support request");
+        conversation.Close(DateTime.UtcNow);
+
+        Assert.Throws<InvalidOperationException>(() => conversation.AssignTo(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public void ChatMessage_ShouldTrimContentAndMarkAsReadOnce()
+    {
+        var firstReadAtUtc = DateTime.UtcNow;
+        var message = new ChatMessage(
+            Guid.NewGuid(), Guid.NewGuid(), "  Hello  ", DateTime.UtcNow);
+
+        message.MarkAsRead(firstReadAtUtc);
+        message.MarkAsRead(firstReadAtUtc.AddMinutes(1));
+
+        Assert.Equal("Hello", message.Content);
+        Assert.Equal(ChatMessageType.Text, message.MessageType);
+        Assert.Equal(firstReadAtUtc, message.ReadAtUtc);
+    }
 }

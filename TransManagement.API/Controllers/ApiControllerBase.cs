@@ -15,13 +15,15 @@ public abstract class ApiControllerBase : ControllerBase
             "Transport.NotFound" => StatusCodes.Status404NotFound,
             "Transport.Conflict" => StatusCodes.Status409Conflict,
             "Transport.CustomerUnavailable" => StatusCodes.Status400BadRequest,
+            "Chat.NotFound" => StatusCodes.Status404NotFound,
+            "Chat.Closed" => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
 
         var details = new ProblemDetails
         {
             Status = statusCode,
-            Title = "Transport operation failed",
+            Title = "Operation failed",
             Detail = error.Description,
             Instance = HttpContext.Request.Path
         };
