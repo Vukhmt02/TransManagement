@@ -6,6 +6,13 @@ interface Props { onLogin: () => void; onRegister: () => void }
 
 type IconName = 'arrow' | 'box' | 'check' | 'clock' | 'location' | 'phone' | 'route' | 'search' | 'shield' | 'truck'
 
+const solutions = [
+  { eyebrow: 'ĐIỀU PHỐI TẬP TRUNG', copy: 'Theo dõi kế hoạch, trạng thái và tiến độ của từng chuyến vận chuyển tại một nơi.', image: '/images/services/gps-visibility.png', alt: 'Trung tâm điều phối và giám sát vận tải' },
+  { eyebrow: 'QUẢN LÝ ĐỘI XE', copy: 'Quản lý phương tiện, tài xế và lịch phân công để khai thác đội xe hiệu quả hơn.', image: '/images/services/full-truckload.png', alt: 'Đội xe tải phục vụ hoạt động vận chuyển' },
+  { eyebrow: 'CẬP NHẬT VỊ TRÍ', copy: 'Cập nhật GPS trong hành trình giúp điều phối chủ động theo dõi tiến độ giao hàng.', image: '/images/services/intercity-freight.png', alt: 'Theo dõi vị trí xe trên hành trình vận chuyển' },
+  { eyebrow: 'GIAO NHẬN RÕ RÀNG', copy: 'Ghi nhận trạng thái, thời gian và bằng chứng giao nhận cho từng đơn hàng.', image: '/images/services/delivery-confirmation.png', alt: 'Tài xế xác nhận giao hàng với khách hàng' },
+]
+
 const services = [
   { eyebrow: 'VẬN CHUYỂN LIÊN TỈNH',  copy: 'Tổ chức hành trình rõ ràng từ điểm nhận đến điểm giao.', image: '/images/services/intercity-freight.png', alt: 'Xe tải vận chuyển hàng hóa liên tỉnh' },
   { eyebrow: 'HÀNG NGUYÊN CHUYẾN',  copy: 'Linh hoạt phương tiện, thời gian khởi hành và kế hoạch giao nhận.', image: '/images/services/full-truckload.png', alt: 'Đội xe tải phục vụ hàng nguyên chuyến' },
@@ -47,8 +54,30 @@ export default function LandingPage({ onLogin, onRegister }: Props) {
   const [tracking, setTracking] = useState('')
   const [notice, setNotice] = useState('')
   const [quoteSent, setQuoteSent] = useState(false)
+  const [solutionPage, setSolutionPage] = useState(0)
   const [servicePage, setServicePage] = useState(0)
+  const solutionCarousel = useRef<HTMLDivElement>(null)
   const serviceCarousel = useRef<HTMLDivElement>(null)
+
+  function scrollSolutions(direction: -1 | 1) {
+    const viewport = solutionCarousel.current
+    if (!viewport) return
+    viewport.scrollBy({ left: direction * viewport.clientWidth * 0.88, behavior: 'smooth' })
+  }
+
+  function updateSolutionPage() {
+    const viewport = solutionCarousel.current
+    if (!viewport) return
+    const maxScroll = viewport.scrollWidth - viewport.clientWidth
+    setSolutionPage(maxScroll > 0 && viewport.scrollLeft > maxScroll / 2 ? 1 : 0)
+  }
+
+  function goToSolutionPage(page: number) {
+    const viewport = solutionCarousel.current
+    if (!viewport) return
+    viewport.scrollTo({ left: page === 0 ? 0 : viewport.scrollWidth, behavior: 'smooth' })
+    setSolutionPage(page)
+  }
 
   function scrollServices(direction: -1 | 1) {
     const viewport = serviceCarousel.current
@@ -104,22 +133,23 @@ export default function LandingPage({ onLogin, onRegister }: Props) {
           </div>
         </div>
       </section>
-      <section className="landing-hero">
-        <h1>Giải pháp quản lí vận tải</h1>
-        <div className="hero-route-lines" aria-hidden="true"/>
-        {/* <div className="hero-lookup" id="tracking">
-          <div className="lookup-title"><span><Icon name="search"/></span><div><small>TRA CỨU NHANH</small><h2>Kiểm tra vận đơn</h2></div></div>
-          <p>Nhập mã đơn để bắt đầu. Thông tin chi tiết chỉ hiển thị sau khi đăng nhập.</p>
-          <form onSubmit={track}><label htmlFor="landing-tracking">Mã vận đơn</label><div><Icon name="box"/><input id="landing-tracking" value={tracking} onChange={event => setTracking(event.target.value)} placeholder="VD: WEB-20261009-AB12"/><button>Tra cứu <Icon name="arrow"/></button></div></form>
-          {notice && <div className="lookup-notice">{notice}{tracking.trim() && <button onClick={onLogin}>Đăng nhập ngay</button>}</div>}
-          <div className="lookup-route"><span><i/>Điểm nhận</span><b/><span><i/>Điểm giao</span></div>
-          <div className="lookup-help"><Icon name="phone"/><span>Cần hỗ trợ?<b>1900 1234</b></span></div>
-        </div> */}
+      <section className="landing-section offers-showcase solutions-showcase" id="solutions">
+        <div className="offers-heading"><h1>GIẢI PHÁP QUẢN LÍ VẬN TẢI</h1><i/><p>Kết nối điều phối, đội xe, vị trí và giao nhận trong một quy trình vận hành thống nhất.</p></div>
+        <div className="offers-slider">
+          <button className="offers-arrow offers-arrow--prev" type="button" onClick={() => scrollSolutions(-1)} aria-label="Xem giải pháp trước"><Icon name="arrow"/></button>
+          <div className="offers-viewport" ref={solutionCarousel} onScroll={updateSolutionPage}>
+            {solutions.map((solution, index) => <article className="service-promo-card" key={solution.eyebrow}>
+              <img src={solution.image} alt={solution.alt} loading={index === 0 ? 'eager' : 'lazy'}/>
+              <div className="service-promo-card__shade"/>
+              <div className="service-promo-card__copy"><h3>{solution.eyebrow}</h3><p>{solution.copy}</p><a href="#process">Tìm hiểu thêm <Icon name="arrow"/></a></div>
+            </article>)}
+          </div>
+          <button className="offers-arrow offers-arrow--next" type="button" onClick={() => scrollSolutions(1)} aria-label="Xem giải pháp tiếp theo"><Icon name="arrow"/></button>
+        </div>
+        <div className="offers-dots" aria-label="Chọn nhóm giải pháp"><button className={solutionPage === 0 ? 'active' : ''} onClick={() => goToSolutionPage(0)} aria-label="Nhóm giải pháp đầu"/><button className={solutionPage === 1 ? 'active' : ''} onClick={() => goToSolutionPage(1)} aria-label="Nhóm giải pháp tiếp theo"/></div>
       </section>
-
-      <section className="capability-strip"><div><Icon name="clock"/><span><b>Điều phối tập trung</b><small>Theo dõi kế hoạch chuyến</small></span></div><div><Icon name="truck"/><span><b>Quản lý đội xe</b><small>Phương tiện và tài xế</small></span></div><div><Icon name="location"/><span><b>Cập nhật vị trí</b><small>Trong quá trình vận chuyển</small></span></div><div><Icon name="check"/><span><b>Giao nhận rõ ràng</b><small>Trạng thái và bằng chứng</small></span></div></section>
       <section className="landing-section route-showcase" id="routes">
-        <div className="section-heading split-heading"><div><p>TUYẾN VẬN CHUYỂN</p><h2>Hành trình được tổ chức rõ ràng từ đầu đến cuối</h2></div><span>Các thẻ dưới đây minh họa cách tuyến đường được trình bày trong hệ thống, không phải lịch chạy cố định.</span></div>
+        <div className="offers-heading route-showcase__heading"><h2>TUYẾN VẬN CHUYỂN</h2><i/><p>Hành trình được tổ chức rõ ràng từ điểm nhận đến điểm giao và theo dõi tập trung trên TransFlow.</p></div>
         <div className="route-grid">{routes.map((route, index) => <article key={route.from}><header><span>0{index + 1}</span><small>{route.type}</small></header><div className="route-points"><div><i/><span><small>Điểm đi</small><b>{route.from}</b></span></div><em/><div><i/><span><small>Điểm đến</small><b>{route.to}</b></span></div></div><footer><span><Icon name="clock"/>{route.time}</span><button onClick={onRegister}>Gửi yêu cầu <Icon name="arrow"/></button></footer></article>)}</div>
       </section>
 
@@ -133,10 +163,10 @@ export default function LandingPage({ onLogin, onRegister }: Props) {
         <div className="offers-slider">
           <button className="offers-arrow offers-arrow--prev" type="button" onClick={() => scrollServices(-1)} aria-label="Xem dịch vụ trước"><Icon name="arrow"/></button>
           <div className="offers-viewport" ref={serviceCarousel} onScroll={updateServicePage}>
-            {services.map((service, index) => <article className="service-promo-card" key={service.title}>
+            {services.map((service, index) => <article className="service-promo-card" key={service.eyebrow}>
               <img src={service.image} alt={service.alt} loading={index === 0 ? 'eager' : 'lazy'}/>
               <div className="service-promo-card__shade"/>
-              <div className="service-promo-card__copy"><small>{service.eyebrow}</small><h3>{service.title}</h3><p>{service.copy}</p><a href="#quote">Yêu cầu tư vấn <Icon name="arrow"/></a></div>
+              <div className="service-promo-card__copy"><h3>{service.eyebrow}</h3><p>{service.copy}</p><a href="#quote">Yêu cầu tư vấn <Icon name="arrow"/></a></div>
             </article>)}
           </div>
           <button className="offers-arrow offers-arrow--next" type="button" onClick={() => scrollServices(1)} aria-label="Xem dịch vụ tiếp theo"><Icon name="arrow"/></button>
@@ -149,7 +179,7 @@ export default function LandingPage({ onLogin, onRegister }: Props) {
 
       <section className="quote-section" id="quote"><div className="quote-copy"><p>YÊU CẦU TƯ VẤN</p><h2>Chuẩn bị cho chuyến hàng tiếp theo?</h2><span>Gửi thông tin cơ bản để bắt đầu. Đơn vận chuyển chính thức được tạo trong cổng khách hàng.</span><div><i><Icon name="phone"/></i><span><small>Đường dây hỗ trợ</small><b>1900 1234</b></span></div></div><form onSubmit={quote}><div className="quote-grid"><label>Họ và tên<input required placeholder="Nguyễn Văn An"/></label><label>Số điện thoại<input required type="tel" placeholder="0901 234 567"/></label><label>Điểm lấy hàng<input required placeholder="TP. Hồ Chí Minh"/></label><label>Điểm giao hàng<input required placeholder="Đà Nẵng"/></label><label>Loại hàng<input required placeholder="Hàng tiêu dùng"/></label><label>Khối lượng dự kiến<input required placeholder="500 kg"/></label></div><button>Gửi yêu cầu tư vấn <Icon name="arrow"/></button>{quoteSent && <p className="quote-success"><Icon name="check"/> Yêu cầu đã được ghi nhận trên giao diện. Đăng ký tài khoản để tạo đơn chính thức.</p>}</form></section>
 
-      <section className="landing-section faq"><div className="section-heading"><p>HỖ TRỢ KHÁCH HÀNG</p><h2>Câu hỏi thường gặp</h2></div><div className="faq-list">{faqs.map(([question,answer],index) => <details key={question} open={index === 0}><summary>{question}<span>+</span></summary><p>{answer}</p></details>)}</div></section>
+      <section className="landing-section faq"><div className="section-heading"><p>HỖ TRỢ KHÁCH HÀNG</p></div><div className="faq-list">{faqs.map(([question,answer],index) => <details key={question} open={index === 0}><summary>{question}<span>+</span></summary><p>{answer}</p></details>)}</div></section>
 
       {/* <section className="final-cta"><div><p>BẮT ĐẦU CÙNG TRANSFLOW</p><h2>Quản lý hành trình rõ ràng hơn ngay hôm nay.</h2></div><div><button onClick={onRegister}>Tạo tài khoản khách hàng <Icon name="arrow"/></button><button onClick={onLogin}>Đăng nhập hệ thống</button></div></section> */}
     </main>
