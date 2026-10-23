@@ -104,7 +104,42 @@ export default function CustomerSupportChat({ accessToken, profile }: Props) {
   useEffect(() => {
     const connection = createChatConnection(accessToken)
     let disposed = false
+    let starting = false
+    let retryTimer: number | undefined
     connectionRef.current = connection
+
+    const restoreConversation = async () => {
+      if (disposed) return
+      setConnectionState('online')
+      if (selectedIdRef.current) {
+        await joinConversation(selectedIdRef.current)
+        await loadMessages(selectedIdRef.current)
+      }
+      await loadConversations()
+    }
+
+    const scheduleStart = () => {
+      if (disposed || retryTimer !== undefined) return
+      setConnectionState('offline')
+      retryTimer = window.setTimeout(() => {
+        retryTimer = undefined
+        void startConnection()
+      }, 5_000)
+    }
+
+    const startConnection = async () => {
+      if (disposed || starting || connection.state !== HubConnectionState.Disconnected) return
+      starting = true
+      setConnectionState('connecting')
+      try {
+        await connection.start()
+        await restoreConversation()
+      } catch {
+        scheduleStart()
+      } finally {
+        starting = false
+      }
+    }
 
     connection.on('messageReceived', (message: ChatMessage) => {
       if (message.conversationId === selectedIdRef.current) {
@@ -112,8 +147,10 @@ export default function CustomerSupportChat({ accessToken, profile }: Props) {
         if (message.senderUserId !== profile.id) void markAsRead(message.conversationId)
       }
     })
-    connection.on('conversationChanged', (_event: ConversationChangedEvent) => {
+    connection.on('conversationChanged', (event: ConversationChangedEvent) => {
       void loadConversations()
+      if (event.change === 'messageSent' && event.conversationId === selectedIdRef.current)
+        void loadMessages(event.conversationId)
     })
     connection.on('messagesRead', (event: MessagesReadEvent) => {
       if (event.conversationId !== selectedIdRef.current || event.readByUserId === profile.id) return
@@ -122,23 +159,14 @@ export default function CustomerSupportChat({ accessToken, profile }: Props) {
         : message))
     })
     connection.onreconnecting(() => setConnectionState('connecting'))
-    connection.onreconnected(async () => {
-      setConnectionState('online')
-      if (selectedIdRef.current) await joinConversation(selectedIdRef.current)
-      await loadConversations()
-    })
-    connection.onclose(() => { if (!disposed) setConnectionState('offline') })
+    connection.onreconnected(() => restoreConversation())
+    connection.onclose(() => scheduleStart())
 
-    void connection.start()
-      .then(async () => {
-        if (disposed) return
-        setConnectionState('online')
-        if (selectedIdRef.current) await joinConversation(selectedIdRef.current)
-      })
-      .catch(() => { if (!disposed) setConnectionState('offline') })
+    void startConnection()
 
     return () => {
       disposed = true
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer)
       connectionRef.current = null
       void connection.stop()
     }
@@ -203,7 +231,7 @@ export default function CustomerSupportChat({ accessToken, profile }: Props) {
   return <section className="customer-support" aria-labelledby="customer-support-title">
     <header className="customer-support__heading">
       <div><p>HỖ TRỢ KHÁCH HÀNG</p><h2 id="customer-support-title">Hỗ trợ trực tuyến</h2><span>Trao đổi trực tiếp với bộ phận quản trị về đơn hàng và dịch vụ vận chuyển.</span></div>
-      <div className={`chat-connection chat-connection--${connectionState}`}><i/>{connectionState === 'online' ? 'Đang kết nối' : connectionState === 'connecting' ? 'Đang kết nối lại' : 'Tạm mất kết nối'}</div>
+      <div className={`chat-connection chat-connection--${connectionState}`}><i/>{connectionState === 'online' ? 'Trực tuyến' : connectionState === 'connecting' ? 'Đang kết nối lại' : 'Tạm mất kết nối'}</div>
     </header>
 
     {error && <div className="chat-error" role="alert">{error}<button type="button" onClick={() => setError('')}>×</button></div>}
@@ -233,7 +261,7 @@ export default function CustomerSupportChat({ accessToken, profile }: Props) {
             })}
             <div ref={messageEndRef}/>
           </div>
-          {selected.status === 'Closed' ? <div className="chat-closed">Cuộc trò chuyện đã được đóng. Vui lòng tạo yêu cầu mới nếu bạn cần thêm hỗ trợ.</div> : <form className="chat-composer" onSubmit={sendMessage}><textarea name="message" maxLength={2000} rows={2} required placeholder="Nhập tin nhắn..." aria-label="Nội dung tin nhắn"/><button disabled={sending || connectionState === 'connecting'}>{sending ? 'Đang gửi' : 'Gửi'} <span>→</span></button></form>}
+          {selected.status === 'Closed' ? <div className="chat-closed">Cuộc trò chuyện đã được đóng. Vui lòng tạo yêu cầu mới nếu bạn cần thêm hỗ trợ.</div> : <form className="chat-composer" onSubmit={sendMessage}><textarea name="message" maxLength={2000} rows={2} required placeholder="Nhập tin nhắn..." aria-label="Nội dung tin nhắn"/><button disabled={sending}>{sending ? 'Đang gửi' : 'Gửi'} <span>→</span></button></form>}
         </>}
       </div>
     </div>

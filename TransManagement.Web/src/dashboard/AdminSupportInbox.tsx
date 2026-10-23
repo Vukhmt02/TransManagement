@@ -5,6 +5,7 @@ import { adminChatApi } from '../portal/chat-api'
 import { createChatConnection, HubConnectionState } from '../portal/chat-realtime'
 import type { ChatConversation, ChatMessage, ConversationChangedEvent, ConversationStatus, MessagesReadEvent } from '../portal/chat-types'
 import './admin-support.css'
+import './admin-support-scroll.css'
 
 interface Props {
   accessToken: string
@@ -122,7 +123,42 @@ export default function AdminSupportInbox({ accessToken, profile, search, onUnre
   useEffect(() => {
     const connection = createChatConnection(accessToken)
     let disposed = false
+    let starting = false
+    let retryTimer: number | undefined
     connectionRef.current = connection
+
+    const restoreConversation = async () => {
+      if (disposed) return
+      setConnectionState('online')
+      if (selectedIdRef.current) {
+        await joinConversation(selectedIdRef.current)
+        await loadMessages(selectedIdRef.current)
+      }
+      await loadConversations()
+    }
+
+    const scheduleStart = () => {
+      if (disposed || retryTimer !== undefined) return
+      setConnectionState('offline')
+      retryTimer = window.setTimeout(() => {
+        retryTimer = undefined
+        void startConnection()
+      }, 5_000)
+    }
+
+    const startConnection = async () => {
+      if (disposed || starting || connection.state !== HubConnectionState.Disconnected) return
+      starting = true
+      setConnectionState('connecting')
+      try {
+        await connection.start()
+        await restoreConversation()
+      } catch {
+        scheduleStart()
+      } finally {
+        starting = false
+      }
+    }
 
     connection.on('messageReceived', (message: ChatMessage) => {
       if (message.conversationId === selectedIdRef.current) {
@@ -138,20 +174,13 @@ export default function AdminSupportInbox({ accessToken, profile, search, onUnre
         : message))
     })
     connection.onreconnecting(() => setConnectionState('connecting'))
-    connection.onreconnected(async () => {
-      setConnectionState('online')
-      if (selectedIdRef.current) await joinConversation(selectedIdRef.current)
-      await loadConversations()
-    })
-    connection.onclose(() => { if (!disposed) setConnectionState('offline') })
-    void connection.start().then(async () => {
-      if (disposed) return
-      setConnectionState('online')
-      if (selectedIdRef.current) await joinConversation(selectedIdRef.current)
-    }).catch(() => { if (!disposed) setConnectionState('offline') })
+    connection.onreconnected(() => restoreConversation())
+    connection.onclose(() => scheduleStart())
+    void startConnection()
 
     return () => {
       disposed = true
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer)
       connectionRef.current = null
       void connection.stop()
     }

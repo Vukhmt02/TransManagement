@@ -1,0 +1,31 @@
+.admin-support-layout {
+  height: clamp(520px, calc(100vh - 245px), 720px);
+  min-height: 0;
+}
+
+.admin-conversation-list,
+.admin-chat-window,
+.admin-chat-details {
+  min-height: 0;
+}
+
+.admin-chat-window {
+  overflow: hidden;
+}
+
+.admin-chat-messages {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+@media (max-width: 620px) {
+  .admin-support-layout {
+    height: auto;
+  }
+
+  .admin-chat-window {
+    height: min(570px, calc(100vh - 120px));
+    min-height: 430px;
+  }
+}
