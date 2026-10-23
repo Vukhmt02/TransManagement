@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using TransManagement.API.Contracts.Common;
+using TransManagement.API.Hubs;
 using TransManagement.Application.Chat;
 using TransManagement.Application.Common.Security;
 using TransManagement.Domain.Enums;
@@ -10,7 +12,9 @@ namespace TransManagement.API.Controllers;
 
 [Authorize(Roles = $"{AppRoles.Admin},{AppRoles.Customer}")]
 [Route("api/chat")]
-public sealed class ChatController(IChatService chatService) : ApiControllerBase
+public sealed class ChatController(
+    IChatService chatService,
+    IHubContext<ChatHub> chatHub) : ApiControllerBase
 {
     [HttpGet("conversations")]
     public async Task<IActionResult> GetConversations(
@@ -44,12 +48,13 @@ public sealed class ChatController(IChatService chatService) : ApiControllerBase
     {
         if (!TryGetUserId(out var userId)) return Unauthorized();
         var result = await chatService.CreateConversationAsync(userId, command, cancellationToken);
-        return result.IsSuccess
-            ? CreatedAtAction(
-                nameof(GetConversation),
-                new { conversationId = result.Value.Id },
-                ApiResponse<ConversationDto>.Ok(result.Value))
-            : ErrorResponse(result.Error);
+        if (!result.IsSuccess) return ErrorResponse(result.Error);
+
+        await NotifyConversationChangedAsync(result.Value, "created", cancellationToken);
+        return CreatedAtAction(
+            nameof(GetConversation),
+            new { conversationId = result.Value.Id },
+            ApiResponse<ConversationDto>.Ok(result.Value));
     }
 
     [HttpGet("conversations/{conversationId:guid}/messages")]
@@ -74,11 +79,20 @@ public sealed class ChatController(IChatService chatService) : ApiControllerBase
         if (!TryGetUserId(out var userId)) return Unauthorized();
         var result = await chatService.SendMessageAsync(
             userId, IsAdmin, conversationId, command, cancellationToken);
-        return result.IsSuccess
-            ? StatusCode(
-                StatusCodes.Status201Created,
-                ApiResponse<ChatMessageDto>.Ok(result.Value))
-            : ErrorResponse(result.Error);
+        if (!result.IsSuccess) return ErrorResponse(result.Error);
+
+        await chatHub.Clients
+            .Group(ChatHub.ConversationGroupName(conversationId))
+            .SendAsync(ChatHubEvents.MessageReceived, result.Value, cancellationToken);
+
+        var conversation = await chatService.GetConversationAsync(
+            userId, IsAdmin, conversationId, cancellationToken);
+        if (conversation.IsSuccess)
+            await NotifyConversationChangedAsync(conversation.Value, "messageSent", cancellationToken);
+
+        return StatusCode(
+            StatusCodes.Status201Created,
+            ApiResponse<ChatMessageDto>.Ok(result.Value));
     }
 
     [HttpPut("conversations/{conversationId:guid}/read")]
@@ -89,7 +103,15 @@ public sealed class ChatController(IChatService chatService) : ApiControllerBase
         if (!TryGetUserId(out var userId)) return Unauthorized();
         var result = await chatService.MarkMessagesAsReadAsync(
             userId, IsAdmin, conversationId, cancellationToken);
-        return result.IsSuccess ? NoContent() : ErrorResponse(result.Error);
+        if (!result.IsSuccess) return ErrorResponse(result.Error);
+
+        await chatHub.Clients
+            .Group(ChatHub.ConversationGroupName(conversationId))
+            .SendAsync(
+                ChatHubEvents.MessagesRead,
+                new MessagesReadEvent(conversationId, userId, DateTime.UtcNow),
+                cancellationToken);
+        return NoContent();
     }
 
     [HttpPut("conversations/{conversationId:guid}/assign")]
@@ -101,9 +123,10 @@ public sealed class ChatController(IChatService chatService) : ApiControllerBase
         if (!TryGetUserId(out var userId)) return Unauthorized();
         var result = await chatService.AssignConversationAsync(
             conversationId, userId, cancellationToken);
-        return result.IsSuccess
-            ? Ok(ApiResponse<ConversationDto>.Ok(result.Value))
-            : ErrorResponse(result.Error);
+        if (!result.IsSuccess) return ErrorResponse(result.Error);
+
+        await NotifyConversationChangedAsync(result.Value, "assigned", cancellationToken);
+        return Ok(ApiResponse<ConversationDto>.Ok(result.Value));
     }
 
     [HttpPut("conversations/{conversationId:guid}/close")]
@@ -112,8 +135,12 @@ public sealed class ChatController(IChatService chatService) : ApiControllerBase
         Guid conversationId,
         CancellationToken cancellationToken)
     {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
         var result = await chatService.CloseConversationAsync(conversationId, cancellationToken);
-        return result.IsSuccess ? NoContent() : ErrorResponse(result.Error);
+        if (!result.IsSuccess) return ErrorResponse(result.Error);
+
+        await NotifyCurrentConversationAsync(userId, conversationId, "closed", cancellationToken);
+        return NoContent();
     }
 
     [HttpPut("conversations/{conversationId:guid}/reopen")]
@@ -122,9 +149,45 @@ public sealed class ChatController(IChatService chatService) : ApiControllerBase
         Guid conversationId,
         CancellationToken cancellationToken)
     {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
         var result = await chatService.ReopenConversationAsync(conversationId, cancellationToken);
-        return result.IsSuccess ? NoContent() : ErrorResponse(result.Error);
+        if (!result.IsSuccess) return ErrorResponse(result.Error);
+
+        await NotifyCurrentConversationAsync(userId, conversationId, "reopened", cancellationToken);
+        return NoContent();
     }
+
+    private async Task NotifyCurrentConversationAsync(
+        Guid adminUserId,
+        Guid conversationId,
+        string change,
+        CancellationToken cancellationToken)
+    {
+        var conversation = await chatService.GetConversationAsync(
+            adminUserId, true, conversationId, cancellationToken);
+        if (conversation.IsSuccess)
+            await NotifyConversationChangedAsync(conversation.Value, change, cancellationToken);
+    }
+
+    private Task NotifyConversationChangedAsync(
+        ConversationDto conversation,
+        string change,
+        CancellationToken cancellationToken) =>
+        chatHub.Clients
+            .Groups(
+                ChatHub.AdminGroupName,
+                ChatHub.UserGroupName(conversation.CustomerUserId),
+                ChatHub.ConversationGroupName(conversation.Id))
+            .SendAsync(
+                ChatHubEvents.ConversationChanged,
+                new ConversationChangedEvent(
+                    conversation.Id,
+                    conversation.Status,
+                    conversation.CustomerUserId,
+                    conversation.AssignedAdminUserId,
+                    change,
+                    DateTime.UtcNow),
+                cancellationToken);
 
     private bool IsAdmin => User.IsInRole(AppRoles.Admin);
 

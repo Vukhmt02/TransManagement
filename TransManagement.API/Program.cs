@@ -75,7 +75,10 @@ builder.Services
             OnMessageReceived = context =>
             {
                 var token = context.Request.Query["access_token"];
-                if (!string.IsNullOrWhiteSpace(token) && context.HttpContext.Request.Path.StartsWithSegments("/hubs/tracking"))
+                var isSignalRRequest =
+                    context.HttpContext.Request.Path.StartsWithSegments("/hubs/tracking") ||
+                    context.HttpContext.Request.Path.StartsWithSegments("/hubs/chat");
+                if (!string.IsNullOrWhiteSpace(token) && isSignalRRequest)
                     context.Token = token;
                 return Task.CompletedTask;
             },
@@ -185,6 +188,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<TrackingHub>("/hubs/tracking");
+app.MapHub<ChatHub>("/hubs/chat");
 app.MapHealthChecks("/health");
 
 app.Run();
