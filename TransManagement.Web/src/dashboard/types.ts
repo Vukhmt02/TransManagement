@@ -122,4 +122,4 @@ export interface DashboardData {
   shipments: Shipment[]
 }
 
-export type DashboardSection = 'overview' | 'orders' | 'shipments' | 'customers' | 'drivers' | 'vehicles'
+export type DashboardSection = 'overview' | 'orders' | 'shipments' | 'customers' | 'drivers' | 'vehicles' | 'support'

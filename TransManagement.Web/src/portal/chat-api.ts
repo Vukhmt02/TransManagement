@@ -30,3 +30,20 @@ export const customerChatApi = {
   markAsRead: (token: string, conversationId: string) =>
     request<void>(token, `/api/chat/conversations/${conversationId}/read`, json('PUT')),
 }
+
+export const adminChatApi = {
+  conversations: (token: string) =>
+    request<ChatConversation[]>(token, '/api/chat/conversations'),
+  messages: (token: string, conversationId: string) =>
+    request<ChatMessage[]>(token, `/api/chat/conversations/${conversationId}/messages`),
+  sendMessage: (token: string, conversationId: string, content: string) =>
+    request<ChatMessage>(token, `/api/chat/conversations/${conversationId}/messages`, json('POST', { content })),
+  markAsRead: (token: string, conversationId: string) =>
+    request<void>(token, `/api/chat/conversations/${conversationId}/read`, json('PUT')),
+  assign: (token: string, conversationId: string) =>
+    request<ChatConversation>(token, `/api/chat/conversations/${conversationId}/assign`, json('PUT')),
+  close: (token: string, conversationId: string) =>
+    request<void>(token, `/api/chat/conversations/${conversationId}/close`, json('PUT')),
+  reopen: (token: string, conversationId: string) =>
+    request<void>(token, `/api/chat/conversations/${conversationId}/reopen`, json('PUT')),
+}

@@ -8,6 +8,8 @@ import './dashboard.css'
 import './management-dashboard.css'
 import './dashboard-large-type.css'
 import FleetTrackingMap from './FleetTrackingMap'
+import AdminSupportInbox from './AdminSupportInbox'
+import { adminChatApi } from '../portal/chat-api'
 
 interface DashboardProps {
   accessToken: string
@@ -24,6 +26,7 @@ const navigation: { id: DashboardSection; label: string; icon: string }[] = [
   { id: 'customers', label: 'Khách hàng', icon: 'users' },
   { id: 'drivers', label: 'Tài xế', icon: 'badge' },
   { id: 'vehicles', label: 'Phương tiện', icon: 'truck' },
+  { id: 'support', label: 'Hộp thư hỗ trợ', icon: 'chat' },
 ]
 
 const titles: Record<DashboardSection, { title: string; subtitle: string }> = {
@@ -33,6 +36,7 @@ const titles: Record<DashboardSection, { title: string; subtitle: string }> = {
   customers: { title: 'Khách hàng', subtitle: 'Danh sách khách hàng đang sử dụng dịch vụ' },
   drivers: { title: 'Tài xế', subtitle: 'Theo dõi trạng thái và giấy phép của đội ngũ tài xế' },
   vehicles: { title: 'Phương tiện', subtitle: 'Quản lý năng lực và tình trạng đội xe' },
+  support: { title: 'Hộp thư hỗ trợ', subtitle: 'Tiếp nhận và phản hồi yêu cầu của khách hàng theo thời gian thực' },
 }
 
 const statusLabels: Record<string, string> = {
@@ -56,6 +60,7 @@ function Icon({ name }: { name: string }) {
     menu: <><path d="M4 7h16M4 12h16M4 17h16"/></>,
     bell: <><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 7h18s-3 0-3-7"/><path d="M10 20h4"/></>,
     logout: <><path d="M10 4H5v16h5M14 8l4 4-4 4M8 12h10"/></>,
+    chat: <><path d="M4 5h16v11H8l-4 4V5Z"/><path d="M8 9h8M8 12h5"/></>,
   }
   return <svg className="dash-icon" viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>
 }
@@ -77,6 +82,8 @@ export default function Dashboard({ accessToken, profile, onLogout }: DashboardP
   const [actionBusy, setActionBusy] = useState(false)
   const [toast, setToast] = useState('')
   const canManage = profile?.roles.some((role) => role === 'Admin' || role === 'Dispatcher') ?? false
+  const isAdmin = profile?.roles.includes('Admin') ?? false
+  const [supportUnread, setSupportUnread] = useState(0)
 
   async function loadData() {
     if (!canManage) return
@@ -89,6 +96,21 @@ export default function Dashboard({ accessToken, profile, onLogout }: DashboardP
 
   useEffect(() => { void loadData() }, [accessToken, canManage])
   useEffect(() => { setSearch('') }, [section])
+  useEffect(() => {
+    if (!isAdmin) return
+    let active = true
+    const loadUnread = async () => {
+      try {
+        const conversations = await adminChatApi.conversations(accessToken)
+        if (active) setSupportUnread(conversations.reduce((total, item) => total + item.unreadCount, 0))
+      } catch {
+        // The inbox displays a detailed error when the administrator opens it.
+      }
+    }
+    void loadUnread()
+    const timer = window.setInterval(() => void loadUnread(), 30000)
+    return () => { active = false; window.clearInterval(timer) }
+  }, [accessToken, isAdmin])
 
   function completed(message: string) {
     setModal(null)
@@ -141,7 +163,7 @@ export default function Dashboard({ accessToken, profile, onLogout }: DashboardP
       <div className="dash-logo"><span><Icon name="truck"/></span><strong>TRANS<b>FLOW</b></strong></div>
       <div className="workspace-card"><span><Icon name="truck"/></span><div><b>TransFlow</b><small>Vận hành thông minh</small></div><em>⌃</em></div>
       <div className="workspace-label">KHÔNG GIAN QUẢN LÝ</div>
-      <nav>{navigation.map((item) => <button key={item.id} className={section === item.id ? 'active' : ''} onClick={() => changeSection(item.id)}><Icon name={item.icon}/><span>{item.label}</span>{item.id === 'orders' && data.orders.filter((x) => x.status === 'WaitingForAssignment').length > 0 && <em>{data.orders.filter((x) => x.status === 'WaitingForAssignment').length}</em>}</button>)}</nav>
+      <nav>{navigation.filter((item) => item.id !== 'support' || isAdmin).map((item) => <button key={item.id} className={section === item.id ? 'active' : ''} onClick={() => changeSection(item.id)}><Icon name={item.icon}/><span>{item.label}</span>{item.id === 'orders' && data.orders.filter((x) => x.status === 'WaitingForAssignment').length > 0 && <em>{data.orders.filter((x) => x.status === 'WaitingForAssignment').length}</em>}{item.id === 'support' && supportUnread > 0 && <em>{supportUnread}</em>}</button>)}</nav>
       <div className="sidebar-account"><div className="avatar">{profile.fullName.charAt(0).toUpperCase()}</div><div><strong>{profile.fullName}</strong><span>{profile.roles[0]}</span></div><button title="Đăng xuất" onClick={() => void onLogout()}><Icon name="logout"/></button></div>
     </aside>
     {sidebarOpen && <button className="sidebar-scrim" aria-label="Đóng menu" onClick={() => setSidebarOpen(false)}/>} 
@@ -150,14 +172,14 @@ export default function Dashboard({ accessToken, profile, onLogout }: DashboardP
       <header className="dash-header">
         <button className="menu-button" onClick={() => setSidebarOpen(true)}><Icon name="menu"/></button>
         <div className="dash-breadcrumb"><span><Icon name="truck"/></span><b>TransFlow</b><i>›</i><strong>{current.title}</strong></div>
-        <div className="header-search"><Icon name="search"/><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm phương tiện hoặc tài xế..."/></div>
+        <div className="header-search"><Icon name="search"/><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={section === 'support' ? 'Tìm khách hàng hoặc chủ đề...' : 'Tìm phương tiện hoặc tài xế...'}/></div>
         <div className="header-actions"><div className="header-profile"><div className="avatar">{profile.fullName.charAt(0).toUpperCase()}</div><span><strong>{profile.fullName}</strong><small>{profile.roles[0]}</small></span></div></div>
       </header>
 
       <main className="dashboard-content">
-        <div className={`page-heading ${section === 'overview' ? 'overview-heading' : ''}`}><div><p>{new Intl.DateTimeFormat('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())}</p><h1>{section === 'overview' ? `Chào buổi sáng, ${profile.fullName.split(' ').slice(-1)[0]}!` : current.title}</h1><span>{section === 'overview' ? 'Tổng quan tình hình vận hành đội xe của bạn.' : current.subtitle}</span></div><button className="refresh-button" onClick={() => void loadData()} disabled={loading}><Icon name="refresh"/>{loading ? 'Đang tải...' : section === 'overview' ? '7 ngày gần nhất' : 'Làm mới'}</button></div>
+        <div className={`page-heading ${section === 'overview' ? 'overview-heading' : ''}`}><div><p>{new Intl.DateTimeFormat('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())}</p><h1>{section === 'overview' ? `Chào buổi sáng, ${profile.fullName.split(' ').slice(-1)[0]}!` : current.title}</h1><span>{section === 'overview' ? 'Tổng quan tình hình vận hành đội xe của bạn.' : current.subtitle}</span></div>{section !== 'support' && <button className="refresh-button" onClick={() => void loadData()} disabled={loading}><Icon name="refresh"/>{loading ? 'Đang tải...' : section === 'overview' ? '7 ngày gần nhất' : 'Làm mới'}</button>}</div>
         {error && <div className="dashboard-error"><b>Không thể cập nhật dữ liệu</b><span>{error}</span><button onClick={() => void loadData()}>Thử lại</button></div>}
-        {loading ? <DashboardSkeleton/> : <SectionContent accessToken={accessToken} isAdmin={profile.roles.includes('Admin')} section={section} data={data} search={search} onEdit={(kind, entity) => setModal({ kind, entity })} onCreate={(kind) => setModal({ kind })} onConfirm={setPending}/>}
+        {loading ? <DashboardSkeleton/> : <SectionContent accessToken={accessToken} profile={profile} isAdmin={isAdmin} section={section} data={data} search={search} onSupportUnreadChange={setSupportUnread} onEdit={(kind, entity) => setModal({ kind, entity })} onCreate={(kind) => setModal({ kind })} onConfirm={setPending}/>}
       </main>
     </div>
     {modal && <ManagementModal {...modal} data={data} accessToken={accessToken} onClose={() => setModal(null)} onDone={completed}/>} 
@@ -172,16 +194,18 @@ function DashboardSkeleton() {
 
 interface SectionProps {
   accessToken: string
+  profile: UserProfile
   isAdmin: boolean
   section: DashboardSection
   data: DashboardData
   search: string
+  onSupportUnreadChange: (count: number) => void
   onEdit: (kind: ModalKind, entity: Customer | Driver | Vehicle | TransportOrder) => void
   onCreate: (kind: ModalKind) => void
   onConfirm: (action: { type: 'customer-toggle' | 'order-cancel' | 'shipment-start' | 'shipment-complete' | 'shipment-cancel'; id: string; name: string; nextValue?: boolean }) => void
 }
 
-function SectionContent({ accessToken, isAdmin, section, data, search, onEdit, onCreate, onConfirm }: SectionProps) {
+function SectionContent({ accessToken, profile, isAdmin, section, data, search, onSupportUnreadChange, onEdit, onCreate, onConfirm }: SectionProps) {
   const term = search.trim().toLocaleLowerCase('vi')
   const includes = (...values: (string | undefined)[]) => !term || values.some((value) => value?.toLocaleLowerCase('vi').includes(term))
   const orders = useMemo(() => data.orders.filter((x) => includes(x.code, x.customerName, x.pickupAddress, x.deliveryAddress, statusLabels[x.status])), [data.orders, term])
@@ -190,6 +214,7 @@ function SectionContent({ accessToken, isAdmin, section, data, search, onEdit, o
   const drivers = data.drivers.filter((x) => includes(x.employeeCode, x.fullName, x.phone, x.licenseNumber, statusLabels[x.status]))
   const vehicles = data.vehicles.filter((x) => includes(x.licensePlate, x.vehicleType, statusLabels[x.status]))
 
+  if (section === 'support') return <AdminSupportInbox accessToken={accessToken} profile={profile} search={search} onUnreadChange={onSupportUnreadChange}/>
   if (section === 'overview') return <ManagementOverview data={data} accessToken={accessToken}/>
   if (section === 'orders') return <DataPanel count={orders.length} label="đơn vận chuyển" actionLabel="Tạo đơn" onAction={() => onCreate('order')}><table><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Hành trình</th><th>Khối lượng</th><th>Giá dự kiến</th><th>Trạng thái</th><th/></tr></thead><tbody>{orders.map((x) => <tr key={x.id}><td><b className="code">{x.code}</b></td><td>{x.customerName}</td><td><div className="route-cell"><span>{x.pickupAddress}</span><i>→</i><span>{x.deliveryAddress}</span></div></td><td>{x.weightKg.toLocaleString('vi-VN')} kg</td><td>{money(x.estimatedPrice)}</td><td>{status(x.status)}</td><td><div className="row-actions">{['Draft','WaitingForAssignment'].includes(x.status) && <button onClick={() => onEdit('order', x)}>Sửa</button>}{['Draft','WaitingForAssignment'].includes(x.status) && <button className="danger" onClick={() => onConfirm({ type: 'order-cancel', id: x.id, name: x.code })}>Hủy</button>}</div></td></tr>)}</tbody></table></DataPanel>
   if (section === 'shipments') return <DataPanel count={shipments.length} label="chuyến xe" actionLabel="Tạo chuyến" onAction={() => onCreate('shipment')}><table><thead><tr><th>Mã chuyến</th><th>Phương tiện</th><th>Tài xế</th><th>Khởi hành</th><th>Số đơn</th><th>Trạng thái</th><th/></tr></thead><tbody>{shipments.map((x) => <tr key={x.id}><td><b className="code">{x.code}</b></td><td><b>{x.licensePlate}</b></td><td>{x.driverName}</td><td>{dateTime(x.plannedDepartureAtUtc)}</td><td>{x.orders.length} đơn</td><td>{status(x.status)}</td><td><ShipmentActions value={x} onConfirm={onConfirm}/></td></tr>)}</tbody></table></DataPanel>
