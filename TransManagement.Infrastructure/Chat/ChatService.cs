@@ -129,14 +129,16 @@ public sealed class ChatService(ApplicationDbContext dbContext) : IChatService
         Guid conversationId,
         CancellationToken cancellationToken)
     {
-        var canAccess = await AccessibleConversations(currentUserId, isAdmin)
-            .AnyAsync(conversation => conversation.Id == conversationId, cancellationToken);
-        if (!canAccess) return Result.Failure(NotFound);
+        var conversation = await FindAccessibleConversationAsync(
+            currentUserId, isAdmin, conversationId, false, cancellationToken);
+        if (conversation is null) return Result.Failure(NotFound);
 
         var unreadMessages = await dbContext.ChatMessages
             .Where(message => message.ConversationId == conversationId &&
-                              message.SenderUserId != currentUserId &&
-                              message.ReadAtUtc == null)
+                              message.ReadAtUtc == null &&
+                              (isAdmin
+                                  ? message.SenderUserId == conversation.CustomerUserId
+                                  : message.SenderUserId != currentUserId))
             .ToListAsync(cancellationToken);
         var now = DateTime.UtcNow;
         foreach (var message in unreadMessages) message.MarkAsRead(now);
@@ -223,8 +225,12 @@ public sealed class ChatService(ApplicationDbContext dbContext) : IChatService
             var lastMessageAtUtc = conversation.Messages.Count == 0
                 ? (DateTime?)null
                 : conversation.Messages.Max(message => message.SentAtUtc);
+            var isCustomerViewer = currentUserId == conversation.CustomerUserId;
             var unreadCount = conversation.Messages.Count(message =>
-                message.SenderUserId != currentUserId && !message.ReadAtUtc.HasValue);
+                !message.ReadAtUtc.HasValue &&
+                (isCustomerViewer
+                    ? message.SenderUserId != currentUserId
+                    : message.SenderUserId == conversation.CustomerUserId));
 
             return new ConversationDto(
                 conversation.Id,
@@ -260,7 +266,9 @@ public sealed class ChatService(ApplicationDbContext dbContext) : IChatService
             message.Id,
             message.ConversationId,
             message.SenderUserId,
-            GetName(names, message.SenderUserId),
+            message.MessageType == ChatMessageType.AiAssistant && !names.ContainsKey(message.SenderUserId)
+                ? "Trợ lý AI TransFlow"
+                : GetName(names, message.SenderUserId),
             message.Content,
             message.SentAtUtc,
             message.ReadAtUtc,

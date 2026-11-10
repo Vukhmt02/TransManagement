@@ -42,6 +42,7 @@ public static class DependencyInjection
         services.AddScoped<IEmailSender, GmailEmailSender>();
         services.AddScoped<ITransportService, TransportService>();
         services.AddScoped<IChatService, ChatService>();
+        services.AddScoped<IAiChatAssistant, AiChatAssistant>();
 
         return services;
     }

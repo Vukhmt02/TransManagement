@@ -17,7 +17,7 @@ interface Props {
 type StatusFilter = 'All' | ConversationStatus
 
 const statusLabels: Record<ConversationStatus, string> = {
-  Open: 'Chờ tiếp nhận',
+  Open: 'AI đang trực · Chờ tiếp nhận',
   Assigned: 'Đang xử lý',
   Closed: 'Đã đóng',
 }
@@ -184,7 +184,7 @@ export default function AdminSupportInbox({ accessToken, profile, search, onUnre
       connectionRef.current = null
       void connection.stop()
     }
-  }, [accessToken, joinConversation, loadConversations, markAsRead, profile.id])
+  }, [accessToken, joinConversation, loadConversations, loadMessages, markAsRead, profile.id])
 
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
@@ -210,6 +210,7 @@ export default function AdminSupportInbox({ accessToken, profile, search, onUnre
       const message = await adminChatApi.sendMessage(accessToken, selectedId, content)
       setMessages(items => items.some(item => item.id === message.id) ? items : [...items, message])
       form.reset()
+      await loadConversations()
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Không thể gửi tin nhắn.')
     } finally {
@@ -244,23 +245,24 @@ export default function AdminSupportInbox({ accessToken, profile, search, onUnre
       <aside className="admin-conversation-list">
         <header><div><b>Hộp thư</b><span>{visibleConversations.length} hội thoại</span></div><button type="button" onClick={() => void loadConversations()} aria-label="Làm mới">↻</button></header>
         <div>{loading ? <p className="admin-chat-empty">Đang tải...</p> : visibleConversations.length === 0 ? <p className="admin-chat-empty">Không có hội thoại phù hợp.</p> : visibleConversations.map(item => <button type="button" className={item.id === selectedId ? 'active' : ''} onClick={() => void selectConversation(item.id)} key={item.id}>
-          <span className="admin-customer-avatar">{item.customerName.charAt(0).toUpperCase()}</span><span><b>{item.customerName}</b><strong>{item.subject}</strong><small>{item.assignedAdminName ? `Phụ trách: ${item.assignedAdminName}` : 'Chưa có người tiếp nhận'} · {formatTime(item.lastMessageAtUtc || item.createdAtUtc)}</small></span>{item.unreadCount > 0 && <i>{item.unreadCount}</i>}
+          <span className="admin-customer-avatar">{item.customerName.charAt(0).toUpperCase()}</span><span><b>{item.customerName}</b><strong>{item.subject}</strong><small>{item.assignedAdminName ? `Phụ trách: ${item.assignedAdminName}` : '✦ AI đang trực · Chờ tiếp nhận'} · {formatTime(item.lastMessageAtUtc || item.createdAtUtc)}</small></span>{item.unreadCount > 0 && <i>{item.unreadCount}</i>}
         </button>)}</div>
       </aside>
 
       <div className="admin-chat-window">
-        {!selected ? <div className="admin-chat-placeholder"><span>✦</span><b>Chọn một hội thoại</b><p>Nội dung trao đổi với khách hàng sẽ hiển thị tại đây.</p></div> : <>
-          <header className="admin-chat-header"><div><span className="admin-customer-avatar">{selected.customerName.charAt(0).toUpperCase()}</span><div><b>{selected.subject}</b><small>{selected.customerName} · {statusLabels[selected.status]}</small></div></div><div>{!selected.assignedAdminUserId && <button disabled={!!busy} onClick={() => void updateConversation('assign')}>Tiếp nhận</button>}{selected.status !== 'Closed' ? <button className="close" disabled={!!busy} onClick={() => void updateConversation('close')}>Đóng hội thoại</button> : <button disabled={!!busy} onClick={() => void updateConversation('reopen')}>Mở lại</button>}</div></header>
+        {!selected ? <div className="admin-chat-placeholder"><span>✦</span><b>Chọn một hội thoại</b><p>Nội dung trao đổi với khách hàng và lịch sử phản hồi của AI sẽ hiển thị tại đây.</p></div> : <>
+          <header className="admin-chat-header"><div><span className="admin-customer-avatar">{selected.customerName.charAt(0).toUpperCase()}</span><div><b>{selected.subject}</b><small>{selected.customerName} · {statusLabels[selected.status]}</small></div></div><div>{!selected.assignedAdminUserId && <button disabled={!!busy} onClick={() => void updateConversation('assign')}>Tiếp nhận (Tắt AI)</button>}{selected.status !== 'Closed' ? <button className="close" disabled={!!busy} onClick={() => void updateConversation('close')}>Đóng hội thoại</button> : <button disabled={!!busy} onClick={() => void updateConversation('reopen')}>Mở lại</button>}</div></header>
           <div className="admin-chat-messages" aria-live="polite">{messagesLoading ? <div className="admin-chat-placeholder compact">Đang tải tin nhắn...</div> : messages.map(message => {
             const own = message.senderUserId === profile.id
-            return <article className={own ? 'own' : ''} key={message.id}><div><small>{own ? 'Bạn' : message.senderName}</small><p>{message.content}</p><footer>{formatTime(message.sentAtUtc)}{own && <span>{message.readAtUtc ? 'Đã đọc' : 'Đã gửi'}</span>}</footer></div></article>
+            const isAi = message.messageType === 'AiAssistant'
+            return <article className={own ? 'own' : isAi ? 'ai' : ''} key={message.id}><div><small>{own ? 'Bạn' : isAi ? `✦ ${message.senderName} (Tự động)` : message.senderName}</small><p>{message.content}</p><footer>{formatTime(message.sentAtUtc)}{own && <span>{message.readAtUtc ? 'Đã đọc' : 'Đã gửi'}</span>}</footer></div></article>
           })}<div ref={messageEndRef}/></div>
-          {selected.status === 'Closed' ? <div className="admin-chat-closed">Hội thoại đã đóng. Mở lại để tiếp tục phản hồi khách hàng.</div> : <form className="admin-chat-composer" onSubmit={sendMessage}><textarea name="message" rows={2} maxLength={2000} required placeholder="Nhập nội dung phản hồi..."/><button disabled={!!busy}>{busy === 'send' ? 'Đang gửi...' : 'Gửi phản hồi'} <span>→</span></button></form>}
+          {selected.status === 'Closed' ? <div className="admin-chat-closed">Hội thoại đã đóng. Mở lại để tiếp tục phản hồi khách hàng.</div> : <form className="admin-chat-composer" onSubmit={sendMessage}><textarea name="message" rows={2} maxLength={2000} required placeholder="Nhập nội dung phản hồi (khi gửi sẽ tự động tiếp nhận hội thoại)..."/><button disabled={!!busy}>{busy === 'send' ? 'Đang gửi...' : 'Gửi phản hồi'} <span>→</span></button></form>}
         </>}
       </div>
 
       <aside className="admin-chat-details">
-        <h3>Thông tin hỗ trợ</h3>{selected ? <><div className="admin-detail-profile"><span>{selected.customerName.charAt(0).toUpperCase()}</span><b>{selected.customerName}</b><small>Khách hàng TransFlow</small></div><dl><div><dt>Trạng thái</dt><dd className={`state-${selected.status.toLowerCase()}`}>{statusLabels[selected.status]}</dd></div><div><dt>Người phụ trách</dt><dd>{selected.assignedAdminName || 'Chưa tiếp nhận'}</dd></div><div><dt>Tạo lúc</dt><dd>{formatTime(selected.createdAtUtc)}</dd></div><div><dt>Cập nhật cuối</dt><dd>{formatTime(selected.lastMessageAtUtc || selected.updatedAtUtc)}</dd></div></dl><div className="admin-detail-note"><b>Nguyên tắc hỗ trợ</b><p>Không yêu cầu khách hàng cung cấp mật khẩu, mã OTP hoặc thông tin thanh toán nhạy cảm qua chat.</p></div></> : <p className="admin-chat-empty">Chọn hội thoại để xem thông tin.</p>}
+        <h3>Thông tin hỗ trợ</h3>{selected ? <><div className="admin-detail-profile"><span>{selected.customerName.charAt(0).toUpperCase()}</span><b>{selected.customerName}</b><small>Khách hàng TransFlow</small></div><dl><div><dt>Trạng thái</dt><dd className={`state-${selected.status.toLowerCase()}`}>{statusLabels[selected.status]}</dd></div><div><dt>Người phụ trách</dt><dd>{selected.assignedAdminName || '✦ Trợ lý AI TransFlow'}</dd></div><div><dt>Tạo lúc</dt><dd>{formatTime(selected.createdAtUtc)}</dd></div><div><dt>Cập nhật cuối</dt><dd>{formatTime(selected.lastMessageAtUtc || selected.updatedAtUtc)}</dd></div></dl><div className="admin-detail-note"><b>Cơ chế AI & Nhân viên</b><p>Khi hội thoại ở trạng thái Chờ tiếp nhận, Trợ lý AI sẽ tự động hỗ trợ khách hàng. Khi bạn bấm Tiếp nhận hoặc gửi phản hồi, AI sẽ dừng để bạn trao đổi trực tiếp.</p></div></> : <p className="admin-chat-empty">Chọn hội thoại để xem thông tin.</p>}
       </aside>
     </div>
   </section>

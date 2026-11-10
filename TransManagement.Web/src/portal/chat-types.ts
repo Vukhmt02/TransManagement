@@ -1,5 +1,7 @@
 export type ConversationStatus = 'Open' | 'Assigned' | 'Closed'
 
+export type ChatMessageType = 'Text' | 'AiAssistant'
+
 export interface ChatConversation {
   id: string
   customerUserId: string
@@ -23,7 +25,7 @@ export interface ChatMessage {
   content: string
   sentAtUtc: string
   readAtUtc?: string
-  messageType: 'Text'
+  messageType: ChatMessageType
 }
 
 export interface ConversationChangedEvent {
@@ -39,4 +41,11 @@ export interface MessagesReadEvent {
   conversationId: string
   readByUserId: string
   readAtUtc: string
+}
+
+export interface AiTypingEvent {
+  conversationId: string
+  botName: string
+  isTyping: boolean
+  occurredAtUtc: string
 }

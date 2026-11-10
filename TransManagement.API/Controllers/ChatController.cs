@@ -14,6 +14,7 @@ namespace TransManagement.API.Controllers;
 [Route("api/chat")]
 public sealed class ChatController(
     IChatService chatService,
+    IAiChatAssistant aiChatAssistant,
     IHubContext<ChatHub> chatHub) : ApiControllerBase
 {
     [HttpGet("conversations")]
@@ -51,10 +52,16 @@ public sealed class ChatController(
         if (!result.IsSuccess) return ErrorResponse(result.Error);
 
         await NotifyConversationChangedAsync(result.Value, "created", cancellationToken);
+        await TrySendAiReplyAsync(userId, result.Value.Id, cancellationToken);
+
+        var updatedConversation = await chatService.GetConversationAsync(
+            userId, false, result.Value.Id, cancellationToken);
+        var dto = updatedConversation.IsSuccess ? updatedConversation.Value : result.Value;
+
         return CreatedAtAction(
             nameof(GetConversation),
-            new { conversationId = result.Value.Id },
-            ApiResponse<ConversationDto>.Ok(result.Value));
+            new { conversationId = dto.Id },
+            ApiResponse<ConversationDto>.Ok(dto));
     }
 
     [HttpGet("conversations/{conversationId:guid}/messages")]
@@ -89,6 +96,14 @@ public sealed class ChatController(
             userId, IsAdmin, conversationId, cancellationToken);
         if (conversation.IsSuccess)
             await NotifyConversationChangedAsync(conversation.Value, "messageSent", cancellationToken);
+
+        if (!IsAdmin &&
+            conversation.IsSuccess &&
+            conversation.Value.Status == ConversationStatus.Open &&
+            !conversation.Value.AssignedAdminUserId.HasValue)
+        {
+            await TrySendAiReplyAsync(userId, conversationId, cancellationToken);
+        }
 
         return StatusCode(
             StatusCodes.Status201Created,
@@ -155,6 +170,50 @@ public sealed class ChatController(
 
         await NotifyCurrentConversationAsync(userId, conversationId, "reopened", cancellationToken);
         return NoContent();
+    }
+
+    private async Task TrySendAiReplyAsync(
+        Guid customerUserId,
+        Guid conversationId,
+        CancellationToken cancellationToken)
+    {
+        var targetGroups = new[]
+        {
+            ChatHub.ConversationGroupName(conversationId),
+            ChatHub.UserGroupName(customerUserId)
+        };
+
+        await chatHub.Clients
+            .Groups(targetGroups)
+            .SendAsync(
+                ChatHubEvents.AiTyping,
+                new AiTypingEvent(conversationId, "Trợ lý AI TransFlow", true, DateTime.UtcNow),
+                cancellationToken);
+
+        try
+        {
+            var aiReply = await aiChatAssistant.GenerateCustomerReplyAsync(
+                customerUserId, conversationId, cancellationToken);
+            if (!aiReply.IsSuccess) return;
+
+            await chatHub.Clients
+                .Groups(targetGroups)
+                .SendAsync(ChatHubEvents.MessageReceived, aiReply.Value, cancellationToken);
+
+            var updatedConversation = await chatService.GetConversationAsync(
+                customerUserId, false, conversationId, cancellationToken);
+            if (updatedConversation.IsSuccess)
+                await NotifyConversationChangedAsync(updatedConversation.Value, "messageSent", cancellationToken);
+        }
+        finally
+        {
+            await chatHub.Clients
+                .Groups(targetGroups)
+                .SendAsync(
+                    ChatHubEvents.AiTyping,
+                    new AiTypingEvent(conversationId, "Trợ lý AI TransFlow", false, DateTime.UtcNow),
+                    cancellationToken);
+        }
     }
 
     private async Task NotifyCurrentConversationAsync(

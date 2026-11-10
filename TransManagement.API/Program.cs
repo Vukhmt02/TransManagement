@@ -9,6 +9,7 @@ using Microsoft.OpenApi.Models;
 using TransManagement.API.Middleware;
 using TransManagement.Application;
 using TransManagement.Infrastructure;
+using TransManagement.Infrastructure.Chat;
 using TransManagement.Infrastructure.Persistence;
 using TransManagement.Infrastructure.Identity;
 using TransManagement.API.Hubs;
@@ -35,6 +36,8 @@ if (jwtOptions.SecretKey.Length < 32 || jwtOptions.SecretKey.Contains("CHANGE_ME
 
 builder.Services.Configure<JwtOptions>(
     builder.Configuration.GetRequiredSection(JwtOptions.SectionName));
+builder.Services.Configure<AiAssistantOptions>(
+    builder.Configuration.GetSection(AiAssistantOptions.SectionName));
 builder.Services.AddOptions<EmailOptions>()
     .Bind(builder.Configuration.GetSection(EmailOptions.SectionName))
     .Validate(options => !string.IsNullOrWhiteSpace(options.Host), "Email:Host is required.")

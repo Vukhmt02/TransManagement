@@ -2,5 +2,6 @@ namespace TransManagement.Domain.Enums;
 
 public enum ChatMessageType
 {
-    Text = 1
+    Text = 1,
+    AiAssistant = 2
 }
